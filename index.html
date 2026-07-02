@@ -1447,8 +1447,10 @@
     if (!currentUser) { state.debts = []; return; }
     try {
       const { data, error } = await sb.from('debts').select('*').eq('user_id', currentUser.id).order('created_at', { ascending: false });
+      console.log('loadDebts result:', { data, error, userId: currentUser.id });
       if (error) throw error;
       state.debts = data || [];
+      console.log('state.debts loaded:', state.debts.length, 'items');
     } catch (e) { console.log('loadDebts error', e.message); state.debts = []; }
   }
 
