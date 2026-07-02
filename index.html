@@ -1178,7 +1178,7 @@
     return bankName(accId) || accId;
   }
 
-  let state = { transactions: [], balances: {}, accounts: [], currentType: 'expense', currentAccount: null, period: 'month', statsCurrency: 'UAH', accountsCurrency: 'UAH', budgetLimit: null, budgetLimitCurrency: 'UAH' };
+  let state = { transactions: [], balances: {}, accounts: [], debts: [], currentType: 'expense', currentAccount: null, period: 'month', statsCurrency: 'UAH', accountsCurrency: 'UAH', budgetLimit: null, budgetLimitCurrency: 'UAH' };
   let rates = { EUR: null, USD: null, fetchedAt: null };
   const RATES_KEY = 'fx_rates_cache';
   let cryptoRates = { BTC: null, ETH: null, USDT: null, SOL: null, XRP: null, TRUMP: null, fetchedAt: null };
@@ -1440,6 +1440,49 @@
       state.balances = {};
       state.accounts = [];
     }
+  }
+
+  async function loadDebts() {
+    if (!currentUser) { state.debts = []; return; }
+    try {
+      const { data, error } = await sb.from('debts').select('*').eq('user_id', currentUser.id).order('created_at', { ascending: false });
+      if (error) throw error;
+      state.debts = data || [];
+    } catch (e) { console.log('loadDebts error', e.message); state.debts = []; }
+  }
+
+  async function saveDebt(debtData, existingId = null) {
+    if (!currentUser) return null;
+    try {
+      let res;
+      if (existingId) {
+        res = await sb.from('debts').update({ ...debtData, updated_at: new Date().toISOString() }).eq('id', existingId).select().single();
+      } else {
+        res = await sb.from('debts').insert({ ...debtData, user_id: currentUser.id }).select().single();
+      }
+      if (res.error) throw res.error;
+      await loadDebts();
+      return res.data;
+    } catch (e) { console.log('saveDebt error', e.message); return null; }
+  }
+
+  async function deleteDebt(debtId) {
+    try {
+      const { error } = await sb.from('debts').delete().eq('id', debtId);
+      if (error) throw error;
+      state.debts = state.debts.filter(d => d.id !== debtId);
+    } catch (e) { console.log('deleteDebt error', e.message); }
+  }
+
+  // Розраховує поточний залишок боргу на основі транзакцій
+  function debtBalance(debt) {
+    const txs = state.transactions.filter(t => t.debt_id === debt.id);
+    let paid = 0;
+    txs.forEach(t => {
+      // Часткове повернення зменшує залишок
+      paid += Number(t.amount);
+    });
+    return Math.max(0, Number(debt.original_amount) - paid);
   }
 
   async function loadBudgetLimit() {
@@ -1742,57 +1785,30 @@
   function renderOwedStatsCards() {
     const wrap = document.getElementById('owed-stats-cards');
 
-    // За весь час — без фільтру по periodLabel
-    const returnTxs = state.transactions.filter(t =>
-      t.category === 'returns' && t.type === 'income'
-    );
-    const owedToMe = {};
-    returnTxs.forEach(t => {
-      owedToMe[t.currency] = (owedToMe[t.currency] || 0) + Number(t.amount);
-    });
+    const toMeDebts = state.debts.filter(d => d.direction === 'to_me' && !d.is_closed);
+    const byMeDebts = state.debts.filter(d => d.direction === 'by_me' && !d.is_closed);
 
-    // "Винен я" — за весь час
-    const debtTxs = state.transactions.filter(t =>
-      t.category === 'obligations' && t.subcategory === 'obligation_debt' && t.type === 'expense'
-    );
-    const owedByMe = {};
-    debtTxs.forEach(t => {
-      owedByMe[t.currency] = (owedByMe[t.currency] || 0) + Number(t.amount);
-    });
+    const toMeTotals = {}, byMeTotals = {};
+    toMeDebts.forEach(d => { toMeTotals[d.currency] = (toMeTotals[d.currency] || 0) + debtBalance(d); });
+    byMeDebts.forEach(d => { byMeTotals[d.currency] = (byMeTotals[d.currency] || 0) + debtBalance(d); });
 
-    const toMeParts = CURRENCIES.filter(c => owedToMe[c]).map(c => SYMS[c] + fmt(owedToMe[c]));
-    const byMeParts = CURRENCIES.filter(c => owedByMe[c]).map(c => SYMS[c] + fmt(owedByMe[c]));
+    const toMeParts = Object.entries(toMeTotals).filter(([,v]) => v > 0).map(([c,v]) => SYMS[c] + fmt(v));
+    const byMeParts = Object.entries(byMeTotals).filter(([,v]) => v > 0).map(([c,v]) => SYMS[c] + fmt(v));
 
-    if (toMeParts.length === 0 && byMeParts.length === 0) {
-      wrap.innerHTML = '';
-      return;
+    if (!toMeParts.length && !byMeParts.length && !toMeDebts.length && !byMeDebts.length) {
+      wrap.innerHTML = ''; return;
     }
-
-    const targetCur = state.statsCurrency;
-    function totalInTarget(bal) {
-      let sum = 0;
-      let ok = true;
-      CURRENCIES.forEach(c => {
-        if (!bal[c]) return;
-        const converted = convertAmount(bal[c], c, targetCur);
-        if (converted === null) { ok = false; return; }
-        sum += converted;
-      });
-      return ok ? sum : null;
-    }
-    const toMeTotal = totalInTarget(owedToMe);
-    const byMeTotal = totalInTarget(owedByMe);
 
     wrap.innerHTML = '<div class="owed-stats-grid">' +
       '<div class="owed-card owed-to-me">' +
-        '<div class="label">Винні мені (всього)</div>' +
+        '<div class="label">Винні мені (' + toMeDebts.length + ')</div>' +
         '<div class="value">' + (toMeParts.length ? toMeParts.join(' · ') : '—') + '</div>' +
-        (toMeTotal !== null && toMeParts.length ? '<div style="font-size:11px; color:rgba(255,255,255,0.7); margin-top:6px;">≈ ' + SYMS[targetCur] + fmt(toMeTotal) + '</div>' : '') +
+        (toMeDebts.length ? '<div style="font-size:11px;color:rgba(255,255,255,0.7);margin-top:6px;">' + toMeDebts.map(d => escapeHtml(d.person_name) + ': ' + SYMS[d.currency] + fmt(debtBalance(d))).join(' · ') + '</div>' : '') +
       '</div>' +
       '<div class="owed-card owed-by-me">' +
-        '<div class="label">Винен я (всього)</div>' +
+        '<div class="label">Я винен (' + byMeDebts.length + ')</div>' +
         '<div class="value">' + (byMeParts.length ? byMeParts.join(' · ') : '—') + '</div>' +
-        (byMeTotal !== null && byMeParts.length ? '<div style="font-size:11px; color:rgba(255,255,255,0.7); margin-top:6px;">≈ ' + SYMS[targetCur] + fmt(byMeTotal) + '</div>' : '') +
+        (byMeDebts.length ? '<div style="font-size:11px;color:rgba(255,255,255,0.7);margin-top:6px;">' + byMeDebts.map(d => escapeHtml(d.person_name) + ': ' + SYMS[d.currency] + fmt(debtBalance(d))).join(' · ') + '</div>' : '') +
       '</div>' +
     '</div>';
   }
@@ -2161,61 +2177,203 @@
   }
 
   let owedDetailsExpanded = { toMe: false, byMe: false };
+  let addingDebt = null; // null | 'to_me' | 'by_me'
 
   function renderOwedBalance() {
     const wrap = document.getElementById('owed-balance-card');
 
-    // За весь час — без фільтру по periodLabel
-    const returnTxs = state.transactions.filter(t => t.category === 'returns' && t.type === 'income');
-    const owedToMeTotals = {};
-    returnTxs.forEach(t => {
-      owedToMeTotals[t.currency] = (owedToMeTotals[t.currency] || 0) + Number(t.amount);
-    });
-    const toMeParts = CURRENCIES.filter(c => owedToMeTotals[c]).map(c => SYMS[c] + fmt(owedToMeTotals[c]));
+    function debtRow(debt) {
+      const remaining = debtBalance(debt);
+      const paid = Number(debt.original_amount) - remaining;
+      const pct = Math.min(100, Math.round((paid / Number(debt.original_amount)) * 100));
+      const closed = remaining <= 0;
+      const txs = state.transactions.filter(t => t.debt_id === debt.id);
 
-    const debtTxs = state.transactions.filter(t =>
-      t.category === 'obligations' && t.subcategory === 'obligation_debt' && t.type === 'expense'
-    );
-    const owedByMeTotals = {};
-    debtTxs.forEach(t => {
-      owedByMeTotals[t.currency] = (owedByMeTotals[t.currency] || 0) + Number(t.amount);
-    });
-    const byMeParts = CURRENCIES.filter(c => owedByMeTotals[c]).map(c => SYMS[c] + fmt(owedByMeTotals[c]));
-
-    function txDetailRows(txs) {
-      if (!txs.length) return '<p style="font-size:12.5px;color:rgba(255,255,255,0.6);margin:6px 0 0;">Немає записів.</p>';
-      return txs.map(t => {
-        const d = new Date(t.date + 'T00:00:00').toLocaleDateString('uk-UA', {day:'numeric', month:'short'});
-        return '<div style="display:flex;justify-content:space-between;font-size:12.5px;padding:4px 0;border-top:0.5px solid rgba(255,255,255,0.15);">' +
-          '<span style="color:rgba(255,255,255,0.8);">' + d + (t.note ? ' · ' + escapeHtml(t.note) : '') + '</span>' +
-          '<span style="font-weight:600;">' + fmtAmount(t.currency, t.amount) + '</span>' +
-        '</div>';
-      }).join('');
+      return '<div style="background:rgba(255,255,255,0.08);border-radius:10px;padding:12px;margin-top:8px;" data-debt-row="' + debt.id + '">' +
+        '<div style="display:flex;justify-content:space-between;align-items:flex-start;">' +
+          '<div>' +
+            '<div style="font-size:14px;font-weight:600;">' + escapeHtml(debt.person_name) + '</div>' +
+            (debt.description ? '<div style="font-size:11.5px;color:rgba(255,255,255,0.65);">' + escapeHtml(debt.description) + '</div>' : '') +
+          '</div>' +
+          '<div style="text-align:right;">' +
+            '<div style="font-size:13px;font-weight:700;">' + SYMS[debt.currency] + fmt(remaining) + ' залишок</div>' +
+            '<div style="font-size:11px;color:rgba(255,255,255,0.6);">з ' + SYMS[debt.currency] + fmt(debt.original_amount) + '</div>' +
+          '</div>' +
+        '</div>' +
+        '<div style="height:4px;background:rgba(255,255,255,0.15);border-radius:2px;margin:8px 0 4px;">' +
+          '<div style="height:100%;width:' + pct + '%;background:rgba(255,255,255,0.7);border-radius:2px;"></div>' +
+        '</div>' +
+        (txs.length ? txs.map(t => {
+          const d = new Date(t.date + 'T00:00:00').toLocaleDateString('uk-UA', {day:'numeric', month:'short'});
+          return '<div style="display:flex;justify-content:space-between;font-size:11.5px;color:rgba(255,255,255,0.7);padding:2px 0;">' +
+            '<span>' + d + (t.note ? ' · ' + escapeHtml(t.note) : '') + '</span>' +
+            '<span>-' + SYMS[debt.currency] + fmt(t.amount) + '</span>' +
+          '</div>';
+        }).join('') : '') +
+        (!closed ? '<button class="edit-bank-btn" style="margin-top:8px;width:100%;text-align:center;color:rgba(255,255,255,0.9);background:rgba(255,255,255,0.15);border-color:rgba(255,255,255,0.3);" data-pay-debt="' + debt.id + '">+ Записати повернення</button>' : '') +
+        '<button style="background:none;border:none;font-size:11px;color:rgba(255,255,255,0.4);padding:4px 0 0;font-family:inherit;cursor:pointer;" data-delete-debt="' + debt.id + '">Видалити борг</button>' +
+      '</div>';
     }
 
-    const toMeDetails = owedDetailsExpanded.toMe ? txDetailRows(returnTxs) : '';
-    const byMeDetails = owedDetailsExpanded.byMe ? txDetailRows(debtTxs) : '';
+    function sectionHtml(direction, label, cls, expandKey) {
+      const debts = state.debts.filter(d => d.direction === direction && !d.is_closed);
+      const closedDebts = state.debts.filter(d => d.direction === direction && d.is_closed);
+      const totalByCur = {};
+      debts.forEach(d => { totalByCur[d.currency] = (totalByCur[d.currency] || 0) + debtBalance(d); });
+      const parts = Object.entries(totalByCur).filter(([,v]) => v > 0).map(([c,v]) => SYMS[c] + fmt(v));
+      const expanded = owedDetailsExpanded[expandKey];
 
-    wrap.innerHTML =
-      '<div class="owed-card owed-to-me" id="owed-to-me-card" style="cursor:pointer;">' +
-        '<div class="label" style="justify-content:space-between;">Очікувані повернення (всього) <span>' + (owedDetailsExpanded.toMe ? '▲' : '▼') + '</span></div>' +
-        '<div class="value">' + (toMeParts.length ? toMeParts.join(' · ') : '—') + '</div>' +
-        (owedDetailsExpanded.toMe ? '<div style="margin-top:4px;">' + toMeDetails + '</div>' : '') +
-      '</div>' +
-      '<div class="owed-card owed-by-me" id="owed-by-me-card" style="cursor:pointer;margin-top:8px;">' +
-        '<div class="label" style="justify-content:space-between;">Мої борги (всього) <span>' + (owedDetailsExpanded.byMe ? '▲' : '▼') + '</span></div>' +
-        '<div class="value">' + (byMeParts.length ? byMeParts.join(' · ') : '—') + '</div>' +
-        (owedDetailsExpanded.byMe ? '<div style="margin-top:4px;">' + byMeDetails + '</div>' : '') +
+      return '<div class="owed-card ' + cls + '" style="margin-bottom:8px;">' +
+        '<div class="label" style="justify-content:space-between;cursor:pointer;" id="owed-toggle-' + expandKey + '">' +
+          label + ' (' + debts.length + ') <span>' + (expanded ? '▲' : '▼') + '</span>' +
+        '</div>' +
+        '<div class="value">' + (parts.length ? parts.join(' · ') : '—') + '</div>' +
+        (expanded ? debts.map(debtRow).join('') +
+          (closedDebts.length ? '<div style="font-size:11.5px;color:rgba(255,255,255,0.5);margin-top:8px;">Закриті: ' + closedDebts.map(d => escapeHtml(d.person_name)).join(', ') + '</div>' : '') +
+          '<button class="edit-bank-btn" style="width:100%;text-align:center;margin-top:10px;color:rgba(255,255,255,0.9);background:rgba(255,255,255,0.15);border-color:rgba(255,255,255,0.3);" id="add-debt-' + direction + '">+ Новий борг</button>' : '') +
       '</div>';
+    }
 
-    document.getElementById('owed-to-me-card').addEventListener('click', () => {
-      owedDetailsExpanded.toMe = !owedDetailsExpanded.toMe;
-      renderOwedBalance();
+    let addFormHtml = '';
+    if (addingDebt) {
+      const dir = addingDebt;
+      addFormHtml = '<div style="background:var(--surface);border:0.5px solid var(--border);border-radius:var(--radius);padding:16px;margin-bottom:8px;">' +
+        '<p style="font-size:14px;font-weight:600;margin:0 0 12px;">' + (dir === 'to_me' ? '+ Хто мені винен' : '+ Кому я винен') + '</p>' +
+        '<div class="auth-field"><label>' + (dir === 'to_me' ? 'Хто винен' : 'Кому винен') + '</label>' +
+          '<input type="text" id="debt-person" placeholder="Ім\'я або опис"></div>' +
+        '<div class="auth-field"><label>Сума боргу</label>' +
+          '<input type="text" inputmode="decimal" id="debt-amount" placeholder="0"></div>' +
+        '<div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:12px;">' +
+          '<div><label style="font-size:12.5px;font-weight:600;color:var(--text-secondary);">Валюта</label>' +
+            '<select id="debt-currency">' + CURRENCIES.map(c => '<option value="' + c + '">' + c + '</option>').join('') + '</select></div>' +
+          '<div><label style="font-size:12.5px;font-weight:600;color:var(--text-secondary);">Опис (опційно)</label>' +
+            '<input type="text" id="debt-desc" placeholder="За що"></div>' +
+        '</div>' +
+        '<button class="save-btn" id="debt-save-btn">Зберегти</button>' +
+        '<button class="group-back-btn" id="debt-cancel-btn" style="margin-top:8px;">Скасувати</button>' +
+      '</div>';
+    }
+
+    wrap.innerHTML = addFormHtml +
+      sectionHtml('to_me', 'Винні мені', 'owed-to-me', 'toMe') +
+      sectionHtml('by_me', 'Я винен', 'owed-by-me', 'byMe');
+
+    // Тогли
+    ['toMe', 'byMe'].forEach(key => {
+      const el = document.getElementById('owed-toggle-' + key);
+      if (el) el.addEventListener('click', () => {
+        owedDetailsExpanded[key] = !owedDetailsExpanded[key];
+        renderOwedBalance();
+      });
     });
-    document.getElementById('owed-by-me-card').addEventListener('click', () => {
-      owedDetailsExpanded.byMe = !owedDetailsExpanded.byMe;
-      renderOwedBalance();
+
+    // Додати новий борг
+    ['to_me', 'by_me'].forEach(dir => {
+      const btn = document.getElementById('add-debt-' + dir);
+      if (btn) btn.addEventListener('click', () => { addingDebt = dir; renderOwedBalance(); });
     });
+
+    // Форма збереження боргу
+    const saveBtn = document.getElementById('debt-save-btn');
+    if (saveBtn) saveBtn.addEventListener('click', async () => {
+      const person = document.getElementById('debt-person').value.trim();
+      const amount = parseFloat(document.getElementById('debt-amount').value.replace(',', '.'));
+      const currency = document.getElementById('debt-currency').value;
+      const desc = document.getElementById('debt-desc').value.trim();
+      if (!person || !amount) return;
+      await saveDebt({ person_name: person, direction: addingDebt, original_amount: amount, currency, description: desc || null });
+      addingDebt = null;
+      owedDetailsExpanded[addingDebt === 'to_me' ? 'toMe' : 'byMe'] = true;
+      renderOwedBalance();
+      renderOwedStatsCards();
+    });
+    document.getElementById('debt-cancel-btn') && document.getElementById('debt-cancel-btn').addEventListener('click', () => { addingDebt = null; renderOwedBalance(); });
+
+    // Записати повернення по конкретному боргу
+    wrap.querySelectorAll('[data-pay-debt]').forEach(btn => {
+      btn.addEventListener('click', async () => {
+        const debtId = btn.dataset.payDebt;
+        const debt = state.debts.find(d => d.id === debtId);
+        if (!debt) return;
+        // Показуємо міні-форму повернення прямо під кнопкою
+        const row = btn.closest('[data-debt-row]');
+        if (row.querySelector('[data-pay-form]')) return; // вже відкрита
+        const formEl = document.createElement('div');
+        formEl.setAttribute('data-pay-form', '1');
+        formEl.style.cssText = 'margin-top:8px;';
+        formEl.innerHTML = '<div style="display:flex;gap:8px;align-items:center;">' +
+          '<input type="text" inputmode="decimal" placeholder="Сума повернення" style="flex:1;background:rgba(255,255,255,0.15);border:0.5px solid rgba(255,255,255,0.3);border-radius:8px;padding:8px;color:#fff;font-size:13px;" id="pay-amount-' + debtId + '">' +
+          '<input type="text" placeholder="Коментар" style="flex:1;background:rgba(255,255,255,0.15);border:0.5px solid rgba(255,255,255,0.3);border-radius:8px;padding:8px;color:#fff;font-size:13px;" id="pay-note-' + debtId + '">' +
+          '<input type="date" style="background:rgba(255,255,255,0.15);border:0.5px solid rgba(255,255,255,0.3);border-radius:8px;padding:8px;color:#fff;font-size:13px;" id="pay-date-' + debtId + '" value="' + new Date().toISOString().split('T')[0] + '">' +
+        '</div>' +
+        '<button class="save-btn" style="margin-top:6px;" id="pay-save-' + debtId + '">Зберегти</button>';
+        row.appendChild(formEl);
+
+        document.getElementById('pay-save-' + debtId).addEventListener('click', async () => {
+          const amount = parseFloat(document.getElementById('pay-amount-' + debtId).value.replace(',', '.'));
+          const note = document.getElementById('pay-note-' + debtId).value.trim();
+          const date = document.getElementById('pay-date-' + debtId).value;
+          if (!amount || amount <= 0) return;
+
+          // Визначаємо тип транзакції залежно від напрямку боргу
+          const txType = debt.direction === 'to_me' ? 'income' : 'expense';
+          const category = debt.direction === 'to_me' ? 'returns' : 'obligations';
+          const subcategory = debt.direction === 'by_me' ? 'obligation_debt' : null;
+
+          const ok = await insertTransactionWithDebt({
+            type: txType, amount, currency: debt.currency,
+            account: state.currentAccount || '__cash_' + debt.currency + '__',
+            category, subcategory, note, date, debt_id: debtId
+          });
+          if (ok) {
+            // Перевіряємо чи борг повністю закритий
+            const remaining = debtBalance(debt);
+            if (remaining <= 0) {
+              await saveDebt({ is_closed: true }, debtId);
+            }
+            renderOwedBalance();
+            renderOwedStatsCards();
+          }
+        });
+      });
+    });
+
+    // Видалити борг
+    wrap.querySelectorAll('[data-delete-debt]').forEach(btn => {
+      btn.addEventListener('click', async () => {
+        if (!confirm('Видалити цей борг? Транзакції залишаться, але відʼязуються від боргу.')) return;
+        await deleteDebt(btn.dataset.deleteDebt);
+        renderOwedBalance();
+        renderOwedStatsCards();
+      });
+    });
+  }
+
+  // Версія insertTransaction що підтримує debt_id
+  async function insertTransactionWithDebt(tx) {
+    if (!currentUser) return false;
+    try {
+      let accountId = tx.account;
+      if (accountId && accountId.startsWith('__cash_') && accountId.endsWith('__')) {
+        const cashCur = accountId.replace('__cash_', '').replace('__', '');
+        const newId = await saveBalance('cash', cashCur, 0, 'Основний', 'debit');
+        if (newId) accountId = newId;
+      }
+      const { data, error } = await sb.from('transactions').insert({
+        user_id: currentUser.id, type: tx.type, amount: tx.amount, currency: tx.currency,
+        account: accountId, category: tx.category, subcategory: tx.subcategory || null,
+        note: tx.note, date: tx.date, debt_id: tx.debt_id || null
+      }).select().single();
+      if (error) throw error;
+      const newTx = { ...data, amount: Number(data.amount) };
+      state.transactions.push(newTx);
+      if (!isPendingTx(newTx)) {
+        const delta = newTx.type === 'income' ? newTx.amount : -newTx.amount;
+        await adjustBalance(accountId, delta);
+      }
+      renderAll();
+      return true;
+    } catch (e) { console.log('insertTransactionWithDebt error', e.message); return false; }
   }
 
   function bankHasBalance(bankId) {
@@ -2678,6 +2836,7 @@
     loadCryptoRates();
     loadData();
     await loadBalances();
+    await loadDebts();
     populateAccountSelect(); // тепер state.accounts заповнений — покаже правильний рахунок
     loadBudgetLimit().then(renderStats);
 
