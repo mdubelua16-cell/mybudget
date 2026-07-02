@@ -648,6 +648,13 @@
     margin-bottom: 8px;
     color: #ffffff;
   }
+  .owed-card input, .owed-card select {
+    -webkit-user-select: text;
+    user-select: text;
+    pointer-events: auto;
+    position: relative;
+    z-index: 10;
+  }
   .owed-card.owed-to-me { background: linear-gradient(135deg, #1f7a52 0%, #1d6f6f 100%); background-size: 200% 200%; animation: gradientShift 8s ease infinite; }
   .owed-card.owed-by-me { background: linear-gradient(135deg, #c2553c 0%, #8a3a6f 100%); background-size: 200% 200%; animation: gradientShift 8s ease infinite; }
   .owed-card.savings-card { background: linear-gradient(135deg, #1d4e8a 0%, #2a6bb0 100%); background-size: 200% 200%; animation: gradientShift 8s ease infinite; }
@@ -2277,26 +2284,35 @@
     }
 
     function sectionHtml(direction, label, cls) {
-      // Основна сума — з транзакцій (як було раніше)
       const txCat = direction === 'to_me' ? 'returns' : 'obligations';
       const txType = direction === 'to_me' ? 'income' : 'expense';
       const relevantTxs = state.transactions.filter(t =>
         t.category === txCat && t.type === txType &&
         (direction === 'to_me' || t.subcategory === 'obligation_debt')
-      );
+      ).sort((a,b) => new Date(b.date) - new Date(a.date));
+
       const txTotals = {};
       relevantTxs.forEach(t => { txTotals[t.currency] = (txTotals[t.currency] || 0) + Number(t.amount); });
       const txParts = CURRENCIES.filter(c => txTotals[c]).map(c => SYMS[c] + fmt(txTotals[c]));
 
-      // Деталізація — конкретні борги з таблиці debts (якщо є)
+      // Конкретні борги з трекера
       const debts = state.debts.filter(d => d.direction === direction && !d.is_closed);
       const closedDebts = state.debts.filter(d => d.direction === direction && d.is_closed);
+
+      const txRows = relevantTxs.length ? relevantTxs.map(t => {
+        const d = new Date(t.date + 'T00:00:00').toLocaleDateString('uk-UA', {day:'numeric', month:'short'});
+        return '<div style="display:flex;justify-content:space-between;align-items:center;font-size:13px;padding:6px 0;border-top:0.5px solid rgba(255,255,255,0.15);">' +
+          '<span style="color:rgba(255,255,255,0.85);">' + d + (t.note ? ' · ' + escapeHtml(t.note) : '') + '</span>' +
+          '<span style="font-weight:600;">' + fmtAmount(t.currency, t.amount) + '</span>' +
+        '</div>';
+      }).join('') : '';
 
       return '<div class="owed-card ' + cls + '" style="margin-bottom:8px;">' +
         '<div class="label">' + label + '</div>' +
         '<div class="value">' + (txParts.length ? txParts.join(' · ') : '—') + '</div>' +
+        (txRows ? '<div style="margin-top:8px;">' + txRows + '</div>' : '') +
         debts.map(debtRow).join('') +
-        (closedDebts.length ? '<div style="font-size:11.5px;color:rgba(255,255,255,0.5);margin-top:8px;">Закриті: ' + closedDebts.map(d => escapeHtml(d.person_name)).join(', ') + '</div>' : '') +
+        (closedDebts.length ? '<div style="font-size:11.5px;color:rgba(255,255,255,0.5);margin-top:8px;">Трекер закритих: ' + closedDebts.map(d => escapeHtml(d.person_name)).join(', ') + '</div>' : '') +
         '<button class="edit-bank-btn" style="width:100%;text-align:center;margin-top:10px;color:rgba(255,255,255,0.9);background:rgba(255,255,255,0.15);border-color:rgba(255,255,255,0.3);" id="add-debt-' + direction + '">+ Додати борг до трекера</button>' +
       '</div>';
     }
