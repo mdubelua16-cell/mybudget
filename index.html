@@ -2399,12 +2399,12 @@
         const formEl = document.createElement('div');
         formEl.setAttribute('data-pay-form', '1');
         formEl.style.cssText = 'margin-top:8px;';
-        formEl.innerHTML = '<div style="display:flex;gap:8px;align-items:center;">' +
-          '<input type="text" inputmode="decimal" placeholder="Сума повернення" style="flex:1;background:rgba(255,255,255,0.15);border:0.5px solid rgba(255,255,255,0.3);border-radius:8px;padding:8px;color:#fff;font-size:13px;" id="pay-amount-' + debtId + '">' +
-          '<input type="text" placeholder="Коментар" style="flex:1;background:rgba(255,255,255,0.15);border:0.5px solid rgba(255,255,255,0.3);border-radius:8px;padding:8px;color:#fff;font-size:13px;" id="pay-note-' + debtId + '">' +
-          '<input type="date" style="background:rgba(255,255,255,0.15);border:0.5px solid rgba(255,255,255,0.3);border-radius:8px;padding:8px;color:#fff;font-size:13px;" id="pay-date-' + debtId + '" value="' + new Date().toISOString().split('T')[0] + '">' +
-        '</div>' +
-        '<button class="save-btn" style="margin-top:6px;" id="pay-save-' + debtId + '">Зберегти</button>';
+        const s = 'width:100%;background:rgba(255,255,255,0.18);border:1px solid rgba(255,255,255,0.4);border-radius:8px;padding:10px 12px;color:#fff;font-size:15px;font-family:inherit;box-sizing:border-box;-webkit-user-select:text;user-select:text;margin-bottom:8px;';
+        formEl.innerHTML =
+          '<input type="text" inputmode="decimal" placeholder="Сума повернення" style="' + s + '" id="pay-amount-' + debtId + '">' +
+          '<input type="text" placeholder="Коментар (опційно)" style="' + s + '" id="pay-note-' + debtId + '">' +
+          '<input type="date" style="' + s + '" id="pay-date-' + debtId + '" value="' + new Date().toISOString().split('T')[0] + '">' +
+          '<button class="save-btn" id="pay-save-' + debtId + '">Зберегти</button>';
         row.appendChild(formEl);
 
         document.getElementById('pay-save-' + debtId).addEventListener('click', async () => {
