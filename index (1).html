@@ -1,0 +1,2807 @@
+<!DOCTYPE html>
+<html lang="uk">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, maximum-scale=1, user-scalable=no">
+<title>Бюджет</title>
+
+<!-- iOS PWA support -->
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<meta name="apple-mobile-web-app-title" content="Бюджет">
+<link rel="apple-touch-icon" href="icon.png">
+<meta name="theme-color" content="#f7f8f7">
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
+
+<style>
+  :root {
+    --bg: #f7f8f7;
+    --surface: #ffffff;
+    --surface-2: #eef1ef;
+    --border: rgba(0,0,0,0.08);
+    --border-strong: rgba(0,0,0,0.14);
+    --text-primary: #1a201d;
+    --text-secondary: #5c655f;
+    --text-muted: #9aa39c;
+    --accent: #1d6f6f;
+    --accent-text: #ffffff;
+    --gradient: linear-gradient(135deg, #16335c 0%, #1d6f6f 50%, #1f7a52 100%);
+    --success: #2f8f5b;
+    --success-bg: rgba(47,143,91,0.1);
+    --danger: #c2553c;
+    --danger-bg: rgba(194,85,60,0.1);
+    --radius: 14px;
+    --font-sans: -apple-system, BlinkMacSystemFont, "SF Pro Text", system-ui, sans-serif;
+  }
+
+  * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+
+  html, body {
+    margin: 0;
+    padding: 0;
+    background:
+      radial-gradient(circle at 10% 0%, rgba(22,51,92,0.05), transparent 45%),
+      radial-gradient(circle at 90% 100%, rgba(31,122,82,0.06), transparent 45%),
+      var(--bg);
+    color: var(--text-primary);
+    font-family: var(--font-sans);
+    height: 100%;
+    overscroll-behavior-y: none;
+  }
+
+  body {
+    padding-top: env(safe-area-inset-top);
+    padding-bottom: env(safe-area-inset-bottom);
+    -webkit-user-select: none;
+    user-select: none;
+  }
+
+  input, select, textarea { -webkit-user-select: text; user-select: text; }
+
+  #app {
+    max-width: 520px;
+    margin: 0 auto;
+    min-height: 100vh;
+    display: flex;
+    flex-direction: column;
+  }
+
+  header {
+    padding: 18px 20px 8px;
+  }
+
+  header h1 {
+    font-size: 22px;
+    font-weight: 600;
+    margin: 0;
+    letter-spacing: -0.01em;
+  }
+
+  main {
+    flex: 1;
+    padding: 0 20px 100px;
+    overflow-y: auto;
+  }
+
+  /* Period selector */
+  .period-row {
+    display: flex;
+    gap: 6px;
+    margin: 14px 0 18px;
+  }
+  .period-btn {
+    flex: 1;
+    padding: 9px 0;
+    background: var(--surface);
+    border: 0.5px solid var(--border);
+    border-radius: 10px;
+    color: var(--text-secondary);
+    font-size: 13px;
+    font-family: inherit;
+  }
+  .period-btn.active {
+    background: var(--gradient);
+    border-color: transparent;
+    color: #ffffff;
+    font-weight: 600;
+  }
+
+  .period-label {
+    text-align: center;
+    color: var(--text-muted);
+    font-size: 13px;
+    margin-bottom: 18px;
+  }
+
+  /* Currency summary cards */
+  .currency-grid {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 8px;
+    margin-bottom: 22px;
+  }
+  .total-uah-card {
+    background: var(--gradient);
+    background-size: 200% 200%;
+    animation: gradientShift 8s ease infinite;
+    border: none;
+    border-radius: var(--radius);
+    padding: 18px 18px;
+    margin-bottom: 14px;
+  }
+  .total-uah-card .label {
+    font-size: 12px;
+    color: rgba(255,255,255,0.75);
+    margin-bottom: 6px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 6px;
+  }
+  .stats-currency-select {
+    background: rgba(255,255,255,0.18);
+    border: 0.5px solid rgba(255,255,255,0.35);
+    border-radius: 6px;
+    color: #ffffff;
+    font-size: 11.5px;
+    font-weight: 600;
+    padding: 3px 6px;
+    margin-right: auto;
+    font-family: inherit;
+  }
+  .stats-currency-select option { color: #1a201d; }
+  .total-uah-card .value {
+    font-size: 28px;
+    font-weight: 700;
+    font-variant-numeric: tabular-nums;
+    color: #ffffff;
+  }
+  .total-uah-card .rate-info {
+    font-size: 11px;
+    color: rgba(255,255,255,0.65);
+    margin-top: 6px;
+  }
+  .refresh-rate-btn {
+    background: none;
+    border: none;
+    color: rgba(255,255,255,0.85);
+    font-size: 11.5px;
+    font-family: inherit;
+    padding: 2px 0;
+  }
+  .currency-card {
+    background: var(--surface);
+    border-radius: var(--radius);
+    padding: 14px 10px;
+    text-align: center;
+  }
+  .currency-card .cur {
+    font-size: 12px;
+    color: var(--text-muted);
+    margin-bottom: 6px;
+    letter-spacing: 0.02em;
+  }
+  .currency-card .balance {
+    font-size: 17px;
+    font-weight: 700;
+    margin-bottom: 8px;
+    font-variant-numeric: tabular-nums;
+  }
+  .currency-card .breakdown {
+    font-size: 10.5px;
+    color: var(--text-muted);
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+  }
+  .currency-card .breakdown .in { color: var(--success); }
+  .currency-card .breakdown .out { color: var(--danger); }
+
+  /* Category bars */
+  .section-title {
+    font-size: 13px;
+    font-weight: 600;
+    color: var(--text-secondary);
+    margin: 0 0 10px;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+  }
+  .cat-row {
+    margin-bottom: 12px;
+  }
+  .cat-row .top {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    font-size: 13.5px;
+    margin-bottom: 5px;
+  }
+  .cat-row .top .name { display: flex; align-items: center; gap: 8px; color: var(--text-primary); }
+  .cat-row .top .amt { color: var(--text-secondary); font-variant-numeric: tabular-nums; }
+  .bar-track { height: 5px; background: var(--surface-2); border-radius: 3px; overflow: hidden; }
+  .bar-fill { height: 100%; background: var(--accent); border-radius: 3px; }
+
+  .empty-msg {
+    text-align: center;
+    color: var(--text-muted);
+    font-size: 14px;
+    padding: 40px 20px;
+    line-height: 1.6;
+  }
+
+  .setup-banner {
+    background: var(--surface-2);
+    border: 1px dashed var(--border-strong);
+    border-radius: var(--radius);
+    padding: 16px;
+    margin-bottom: 16px;
+    text-align: center;
+  }
+  .setup-banner .icon { font-size: 26px; margin-bottom: 8px; }
+  .setup-banner .title { font-size: 14.5px; font-weight: 600; margin-bottom: 4px; }
+  .setup-banner .desc { font-size: 13px; color: var(--text-secondary); margin-bottom: 12px; line-height: 1.5; }
+  .setup-banner .dismiss-btn { font-size: 12.5px; color: var(--text-muted); background: none; border: none; font-family: inherit; padding: 4px; }
+
+  .budget-limit-card {
+    background: var(--surface);
+    border: 0.5px solid var(--border);
+    border-radius: var(--radius);
+    padding: 16px 18px;
+    margin-bottom: 14px;
+  }
+  .budget-limit-card .top-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 10px;
+  }
+  .budget-limit-card .title { font-size: 13px; font-weight: 600; color: var(--text-secondary); }
+  .budget-limit-card .edit-link { font-size: 12.5px; color: var(--accent); background: none; border: none; font-family: inherit; padding: 0; }
+  .budget-limit-card .amounts { display: flex; justify-content: space-between; align-items: baseline; margin-bottom: 8px; }
+  .budget-limit-card .spent { font-size: 20px; font-weight: 700; }
+  .budget-limit-card .limit { font-size: 13px; color: var(--text-muted); }
+  .budget-progress-track { height: 8px; background: var(--surface-2); border-radius: 4px; overflow: hidden; }
+  .budget-progress-fill { height: 100%; border-radius: 4px; transition: width 0.3s ease; }
+  .budget-limit-card .remaining { font-size: 12px; color: var(--text-muted); margin-top: 8px; }
+  .budget-setup-row { display: flex; gap: 8px; margin-top: 4px; }
+  .budget-setup-row input { flex: 1; }
+  .budget-setup-row select { width: 90px; }
+  .budget-setup-row button {
+    background: var(--gradient);
+    color: #fff;
+    border: none;
+    border-radius: 12px;
+    padding: 0 18px;
+    font-size: 14px;
+    font-weight: 600;
+    font-family: inherit;
+  }
+
+  .filter-chips {
+    display: flex;
+    gap: 6px;
+    overflow-x: auto;
+    padding: 12px 0 4px;
+    margin: 0 -20px;
+    padding-left: 20px;
+    padding-right: 20px;
+  }
+  .filter-chips::-webkit-scrollbar { display: none; }
+  .filter-chip {
+    flex-shrink: 0;
+    background: var(--surface);
+    border: 0.5px solid var(--border);
+    border-radius: 20px;
+    padding: 7px 14px;
+    font-size: 13px;
+    color: var(--text-secondary);
+    font-family: inherit;
+    white-space: nowrap;
+  }
+  .filter-chip.active { background: var(--accent); border-color: var(--accent); color: #fff; font-weight: 600; }
+
+  /* Transaction list */
+  .tx-item {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 12px 0;
+    border-bottom: 0.5px solid var(--border);
+  }
+  .tx-item:last-child { border-bottom: none; }
+  .tx-left { display: flex; align-items: center; gap: 12px; }
+  .tx-icon {
+    width: 36px; height: 36px;
+    border-radius: 10px;
+    background: var(--surface-2);
+    display: flex; align-items: center; justify-content: center;
+    font-size: 17px;
+    flex-shrink: 0;
+  }
+  .tx-name { font-size: 14.5px; font-weight: 500; margin: 0; }
+  .tx-meta { font-size: 12px; color: var(--text-muted); margin: 1px 0 0; }
+  .tx-amt { font-size: 14.5px; font-weight: 600; font-variant-numeric: tabular-nums; white-space: nowrap; }
+  .tx-amt.in { color: var(--success); }
+  .tx-amt.out { color: var(--danger); }
+
+  /* Tab bar */
+  nav.tabbar {
+    position: fixed;
+    bottom: 0; left: 0; right: 0;
+    background: rgba(255,255,255,0.85);
+    backdrop-filter: blur(20px);
+    -webkit-backdrop-filter: blur(20px);
+    border-top: 0.5px solid var(--border);
+    display: flex;
+    padding-bottom: env(safe-area-inset-bottom);
+    z-index: 100;
+  }
+  nav.tabbar .tab {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 3px;
+    padding: 10px 0 8px;
+    color: var(--text-muted);
+    font-size: 10.5px;
+    background: none;
+    border: none;
+    font-family: inherit;
+  }
+  nav.tabbar .tab.active { color: var(--accent); position: relative; }
+  nav.tabbar .tab.active::before {
+    content: '';
+    position: absolute;
+    top: 2px;
+    left: 50%;
+    transform: translateX(-50%);
+    width: 28px;
+    height: 3px;
+    border-radius: 2px;
+    background: var(--gradient);
+  }
+  nav.tabbar .tab svg { width: 23px; height: 23px; }
+
+  .view { display: none; padding-top: 4px; }
+  .view.active { display: block; }
+
+  /* Add form */
+  .type-toggle {
+    display: flex;
+    gap: 8px;
+    margin: 16px 0 16px;
+  }
+  .type-toggle button {
+    flex: 1;
+    padding: 13px 0;
+    border-radius: 12px;
+    border: 0.5px solid var(--border);
+    background: var(--surface);
+    color: var(--text-secondary);
+    font-size: 14.5px;
+    font-weight: 500;
+    font-family: inherit;
+  }
+  .type-toggle button.sel-out { background: var(--danger-bg); border-color: var(--danger); color: var(--danger); }
+  .type-toggle button.sel-in { background: var(--success-bg); border-color: var(--success); color: var(--success); }
+
+  .field-label {
+    font-size: 12.5px;
+    color: var(--text-muted);
+    margin: 16px 0 7px;
+    font-weight: 500;
+  }
+
+  .amount-row { display: grid; grid-template-columns: 1fr 92px; gap: 8px; }
+
+  input[type="number"], input[type="text"], input[type="date"], select {
+    width: 100%;
+    background: var(--surface);
+    border: 0.5px solid var(--border);
+    border-radius: 12px;
+    padding: 13px 14px;
+    color: var(--text-primary);
+    font-size: 16px;
+    font-family: inherit;
+  }
+  input::placeholder { color: var(--text-muted); }
+  select {
+    appearance: none;
+    -webkit-appearance: none;
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%235c655f' stroke-width='2'%3E%3Cpath d='M6 9l6 6 6-6' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
+    background-repeat: no-repeat;
+    background-position: right 12px center;
+    background-size: 18px;
+    padding-right: 38px;
+  }
+  .account-select-prominent {
+    border: 1.5px solid var(--accent) !important;
+    background-color: rgba(29,111,111,0.05);
+    font-weight: 600;
+  }
+
+  .cat-grid {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 8px;
+  }
+  .cat-pick {
+    background: var(--surface);
+    border: 0.5px solid var(--border);
+    border-radius: 12px;
+    padding: 12px 4px;
+    display: flex; flex-direction: column; align-items: center; gap: 6px;
+    color: var(--text-secondary);
+    font-size: 11px;
+    font-family: inherit;
+  }
+  .cat-pick.active { border-color: var(--accent); color: var(--accent); background: rgba(29,111,111,0.08); font-weight: 600; }
+  .cat-pick.cat-highlight-savings { border-color: #2a6bb0; color: #2a6bb0; background: rgba(42,107,176,0.07); }
+  .cat-pick.cat-highlight-savings.active { border-color: #2a6bb0; background: rgba(42,107,176,0.14); }
+  .cat-pick.cat-highlight-obligations { border-color: var(--danger); color: var(--danger); background: rgba(194,85,60,0.07); }
+  .cat-pick.cat-highlight-obligations.active { border-color: var(--danger); background: rgba(194,85,60,0.14); }
+  .cat-pick.cat-highlight-returns { border-color: #1f7a52; color: #1f7a52; background: rgba(31,122,82,0.07); }
+  .cat-pick.cat-highlight-returns.active { border-color: #1f7a52; background: rgba(31,122,82,0.14); }
+  .cat-pick-wide {
+    flex-direction: row !important;
+    justify-content: center;
+    padding: 11px 4px !important;
+    font-size: 13px !important;
+    gap: 8px !important;
+  }
+  .cat-pick-wide .em { font-size: 16px; }
+  .acc-btn.active-acc {
+    position: relative;
+    background: var(--surface-2);
+    border-color: transparent;
+    color: var(--text-primary);
+    font-weight: 600;
+  }
+  .acc-btn.active-acc::after {
+    content: '';
+    position: absolute;
+    inset: 0;
+    border-radius: inherit;
+    padding: 1.5px;
+    background: var(--gradient);
+    -webkit-mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
+    -webkit-mask-composite: xor;
+    mask-composite: exclude;
+    pointer-events: none;
+  }
+  .cat-pick .em { font-size: 19px; }
+
+  .save-btn {
+    width: 100%;
+    margin-top: 24px;
+    padding: 15px;
+    background: var(--gradient);
+    background-size: 200% 200%;
+    animation: gradientShift 6s ease infinite;
+    color: var(--accent-text);
+    border: none;
+    border-radius: 12px;
+    font-size: 16px;
+    font-weight: 600;
+    font-family: inherit;
+  }
+  @keyframes gradientShift {
+    0% { background-position: 0% 50%; }
+    50% { background-position: 100% 50%; }
+    100% { background-position: 0% 50%; }
+  }
+  .save-btn:active { opacity: 0.85; }
+
+  .save-msg { text-align: center; font-size: 13px; margin: 10px 0 0; min-height: 18px; }
+  .save-msg.ok { color: var(--success); }
+  .save-msg.err { color: var(--danger); }
+
+  .del-btn {
+    background: none; border: none; color: var(--text-muted);
+    padding: 6px; margin: -6px; font-size: 18px; line-height: 1;
+  }
+
+  ::-webkit-scrollbar { display: none; }
+
+  /* Accounts view */
+  .bank-group-title {
+    font-size: 12px;
+    color: var(--text-muted);
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    margin: 20px 0 8px;
+  }
+  .bank-group-title:first-child { margin-top: 4px; }
+
+  .group-grid {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: 8px;
+    margin-bottom: 8px;
+  }
+  .group-card {
+    background: var(--surface);
+    border: 0.5px solid var(--border);
+    border-radius: var(--radius);
+    padding: 14px;
+    text-align: left;
+    color: var(--text-primary);
+    font-family: inherit;
+  }
+  .group-card .group-name {
+    font-size: 14.5px;
+    font-weight: 600;
+    margin-bottom: 4px;
+  }
+  .group-card .group-total {
+    font-size: 12px;
+    color: var(--text-muted);
+  }
+  .group-back-btn {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    background: none;
+    border: none;
+    color: var(--accent);
+    font-family: inherit;
+    font-size: 14px;
+    font-weight: 500;
+    padding: 4px 0 14px;
+  }
+  .bank-card {
+    background: var(--surface);
+    border: 0.5px solid var(--border);
+    border-radius: var(--radius);
+    padding: 12px 14px;
+    margin-bottom: 8px;
+  }
+  .bank-card .bank-head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 8px;
+  }
+  .bank-card .bank-name {
+    font-size: 14.5px;
+    font-weight: 500;
+  }
+  .bank-card .bank-total {
+    font-size: 12px;
+    color: var(--text-muted);
+  }
+  .bank-balances {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 6px;
+  }
+  .bank-balance-input {
+    display: flex;
+    flex-direction: column;
+    gap: 3px;
+  }
+  .bank-balance-input label {
+    font-size: 10.5px;
+    color: var(--text-muted);
+    text-align: center;
+  }
+  .bank-balance-input input {
+    width: 100%;
+    padding: 8px 4px;
+    text-align: center;
+    font-size: 13px;
+    background: var(--surface-2);
+    border: 0.5px solid var(--border);
+    border-radius: 8px;
+    color: var(--text-primary);
+  }
+  .accounts-total-card {
+    background: var(--gradient);
+    background-size: 200% 200%;
+    animation: gradientShift 8s ease infinite;
+    border-radius: var(--radius);
+    padding: 18px;
+    margin-bottom: 18px;
+  }
+  .accounts-total-card .label {
+    font-size: 12px;
+    color: rgba(255,255,255,0.75);
+    margin-bottom: 6px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+  .accounts-total-card .value {
+    font-size: 28px;
+    font-weight: 700;
+    color: #ffffff;
+    font-variant-numeric: tabular-nums;
+  }
+  .accounts-total-card .breakdown {
+    font-size: 12px;
+    color: rgba(255,255,255,0.8);
+    margin-top: 8px;
+    display: flex;
+    gap: 14px;
+    flex-wrap: wrap;
+  }
+  .accounts-total-card .bank-rows {
+    margin-top: 14px;
+    padding-top: 12px;
+    border-top: 0.5px solid rgba(255,255,255,0.25);
+  }
+  .accounts-total-card .bank-row {
+    display: flex;
+    justify-content: space-between;
+    font-size: 13px;
+    padding: 4px 0;
+    color: rgba(255,255,255,0.92);
+  }
+  .accounts-total-card .bank-row .name { color: rgba(255,255,255,0.75); }
+  .accounts-total-card .bank-row .vals { font-variant-numeric: tabular-nums; font-weight: 500; }
+
+  .owed-card {
+    border-radius: var(--radius);
+    padding: 16px 18px;
+    margin-bottom: 8px;
+    color: #ffffff;
+  }
+  .owed-card.owed-to-me { background: linear-gradient(135deg, #1f7a52 0%, #1d6f6f 100%); background-size: 200% 200%; animation: gradientShift 8s ease infinite; }
+  .owed-card.owed-by-me { background: linear-gradient(135deg, #c2553c 0%, #8a3a6f 100%); background-size: 200% 200%; animation: gradientShift 8s ease infinite; }
+  .owed-card.savings-card { background: linear-gradient(135deg, #1d4e8a 0%, #2a6bb0 100%); background-size: 200% 200%; animation: gradientShift 8s ease infinite; }
+  .savings-card .subcat-rows { margin-top: 10px; display: flex; flex-direction: column; gap: 6px; }
+  .savings-card .subcat-row { display: flex; justify-content: space-between; font-size: 13px; color: rgba(255,255,255,0.92); }
+  .savings-card .subcat-row .name { color: rgba(255,255,255,0.75); }
+  .owed-card .label { font-size: 12px; color: rgba(255,255,255,0.75); margin-bottom: 6px; }
+  .owed-card .value { font-size: 22px; font-weight: 700; font-variant-numeric: tabular-nums; margin-bottom: 10px; }
+  .owed-card .owed-inputs {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 6px;
+  }
+  .owed-card .owed-inputs label { font-size: 10.5px; color: rgba(255,255,255,0.7); text-align: center; display: block; margin-bottom: 3px; }
+  .owed-card .owed-inputs input {
+    width: 100%;
+    padding: 8px 4px;
+    text-align: center;
+    font-size: 13px;
+    background: rgba(255,255,255,0.15);
+    border: 0.5px solid rgba(255,255,255,0.3);
+    border-radius: 8px;
+    color: #ffffff;
+  }
+  .owed-card .owed-inputs input::placeholder { color: rgba(255,255,255,0.5); }
+
+  .bank-list-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    background: var(--surface);
+    border: 0.5px solid var(--border);
+    border-radius: var(--radius);
+    padding: 12px 14px;
+    margin-bottom: 8px;
+  }
+  .bank-list-row .name { font-size: 14.5px; font-weight: 500; }
+  .bank-list-row .vals { font-size: 13px; color: var(--text-secondary); font-variant-numeric: tabular-nums; }
+  .bank-list-row .left-info { display: flex; flex-direction: column; align-items: flex-start; gap: 2px; }
+  .edit-bank-btn {
+    background: var(--surface-2);
+    border: 0.5px solid var(--border-strong);
+    border-radius: 8px;
+    padding: 6px 12px;
+    font-size: 12px;
+    font-weight: 500;
+    color: var(--accent);
+    font-family: inherit;
+    flex-shrink: 0;
+  }
+  .add-account-btn {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+    width: 100%;
+    padding: 12px;
+    background: var(--surface);
+    border: 1px dashed var(--border-strong);
+    border-radius: var(--radius);
+    color: var(--accent);
+    font-family: inherit;
+    font-size: 14px;
+    font-weight: 500;
+    margin-bottom: 8px;
+  }
+  .country-pick-grid {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: 8px;
+    margin-bottom: 8px;
+  }
+  .country-pick {
+    background: var(--surface);
+    border: 0.5px solid var(--border);
+    border-radius: var(--radius);
+    padding: 14px;
+    text-align: left;
+    color: var(--text-primary);
+    font-family: inherit;
+    font-size: 14.5px;
+    font-weight: 600;
+  }
+  .bank-pick-list {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    margin-bottom: 8px;
+  }
+  .bank-pick-row {
+    background: var(--surface);
+    border: 0.5px solid var(--border);
+    border-radius: var(--radius);
+    padding: 13px 14px;
+    text-align: left;
+    color: var(--text-primary);
+    font-family: inherit;
+    font-size: 14.5px;
+  }
+
+  .owed-stats-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 8px;
+    margin-bottom: 14px;
+  }
+  .owed-stats-grid .owed-card { margin-bottom: 0; padding: 14px; }
+  .owed-stats-grid .owed-card .label { font-size: 11px; margin-bottom: 8px; }
+  .owed-stats-grid .owed-card .value { font-size: 18px; margin-bottom: 0; }
+
+  /* Auth screen */
+  #auth-screen {
+    min-height: 100vh;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 24px;
+    background:
+      radial-gradient(circle at 15% 10%, rgba(22,51,92,0.10), transparent 45%),
+      radial-gradient(circle at 85% 90%, rgba(31,122,82,0.12), transparent 45%),
+      var(--bg);
+  }
+  .auth-card {
+    width: 100%;
+    max-width: 400px;
+    background: var(--surface);
+    border-radius: 24px;
+    padding: 36px 28px;
+    box-shadow: 0 1px 2px rgba(0,0,0,0.04), 0 12px 32px rgba(0,0,0,0.06);
+    border: 0.5px solid var(--border);
+  }
+  .auth-logo {
+    width: 56px;
+    height: 56px;
+    border-radius: 16px;
+    background: var(--gradient);
+    background-size: 200% 200%;
+    animation: gradientShift 6s ease infinite;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 28px;
+    margin: 0 auto 20px;
+  }
+  #auth-screen h1 {
+    font-size: 24px;
+    font-weight: 600;
+    margin: 0 0 6px;
+    text-align: center;
+  }
+  #auth-screen .sub {
+    color: var(--text-secondary);
+    font-size: 14px;
+    margin: 0 0 26px;
+    text-align: center;
+  }
+  .auth-field {
+    margin-bottom: 16px;
+    text-align: left;
+  }
+  .auth-field label {
+    display: block;
+    font-size: 12.5px;
+    font-weight: 600;
+    color: var(--text-secondary);
+    margin-bottom: 6px;
+  }
+  #auth-screen input {
+    margin-bottom: 0;
+    padding: 15px 16px;
+    font-size: 16px;
+    border-radius: 14px;
+    border: 1.5px solid var(--border);
+    transition: border-color 0.15s ease;
+  }
+  #auth-screen input:focus {
+    outline: none;
+    border-color: var(--accent);
+  }
+  #auth-screen .auth-btn {
+    width: 100%;
+    margin-top: 8px;
+    padding: 16px;
+    background: var(--gradient);
+    background-size: 200% 200%;
+    animation: gradientShift 6s ease infinite;
+    color: var(--accent-text);
+    border: none;
+    border-radius: 14px;
+    font-size: 16px;
+    font-weight: 600;
+    font-family: inherit;
+  }
+  #auth-screen .switch-mode {
+    text-align: center;
+    margin-top: 22px;
+    font-size: 13.5px;
+    color: var(--text-secondary);
+  }
+  #auth-screen .switch-mode button {
+    background: none;
+    border: none;
+    color: var(--accent);
+    font-family: inherit;
+    font-size: 13.5px;
+    font-weight: 600;
+    padding: 0;
+  }
+  #auth-msg {
+    text-align: center;
+    font-size: 13px;
+    margin: 0 0 14px;
+    min-height: 18px;
+    line-height: 1.6;
+  }
+  #auth-msg.err { color: var(--danger); }
+  #auth-msg.ok { color: var(--success); }
+  #auth-msg.info {
+    background: rgba(31,122,82,0.08);
+    border: 1px solid rgba(31,122,82,0.25);
+    border-radius: 12px;
+    padding: 12px 14px;
+    color: #1a5c3a;
+    text-align: left;
+  }
+  #auth-msg.ok { color: var(--success); }
+  .account-bar {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 0 0 4px;
+  }
+  .account-bar .email {
+    font-size: 12px;
+    color: var(--text-muted);
+  }
+  .account-bar button {
+    background: none;
+    border: none;
+    color: var(--text-muted);
+    font-size: 12px;
+    font-family: inherit;
+    padding: 4px 0;
+  }
+</style>
+</head>
+<body>
+
+<div id="auth-screen">
+  <div class="auth-card">
+    <div class="auth-logo">💰</div>
+    <h1 id="auth-title">Вхід</h1>
+    <p class="sub" id="auth-sub">Увійди, щоб вести свій бюджет.</p>
+    <p id="auth-msg"></p>
+
+    <div class="auth-field">
+      <label for="auth-email">Email</label>
+      <input type="email" id="auth-email" placeholder="name@example.com" autocomplete="email">
+    </div>
+    <div class="auth-field">
+      <label for="auth-password">Пароль</label>
+      <input type="password" id="auth-password" placeholder="Щонайменше 6 символів" autocomplete="current-password">
+    </div>
+    <div class="auth-field" id="auth-confirm-wrap" style="display:none;">
+      <label for="auth-password-confirm">Підтвердити пароль</label>
+      <input type="password" id="auth-password-confirm" placeholder="Введи пароль ще раз" autocomplete="new-password">
+    </div>
+
+    <button class="auth-btn" id="auth-submit">Увійти</button>
+    <div class="switch-mode">
+      <span id="switch-text">Ще немає акаунту?</span> <button id="switch-btn">Зареєструватись</button>
+    </div>
+  </div>
+</div>
+
+<div id="app" style="display:none;">
+  <header>
+    <div class="account-bar">
+      <span class="email" id="user-email"></span>
+      <button id="logout-btn">Вийти</button>
+    </div>
+    <h1 id="header-title">Бюджет</h1>
+  </header>
+
+  <main>
+
+    <!-- STATS VIEW -->
+    <div class="view active" id="view-stats">
+      <div class="period-row">
+        <button class="period-btn" data-period="day">День</button>
+        <button class="period-btn" data-period="week">Тиждень</button>
+        <button class="period-btn active" data-period="month">Місяць</button>
+        <button class="period-btn" data-period="year">Рік</button>
+      </div>
+      <p class="period-label" id="period-label"></p>
+
+      <div class="total-uah-card" id="total-uah-card"></div>
+      <div id="budget-limit-card"></div>
+      <div id="owed-stats-cards"></div>
+
+      <div class="currency-grid" id="currency-grid"></div>
+
+      <div id="account-section" style="margin-bottom:22px;"></div>
+
+      <div id="category-section"></div>
+    </div>
+
+    <!-- LIST VIEW -->
+    <div class="view" id="view-list">
+      <input type="text" id="tx-search" placeholder="Пошук за коментарем чи категорією" style="margin-top:16px;">
+      <div class="filter-chips" id="tx-filter-chips"></div>
+      <p class="section-title" style="margin-top:16px;">Всі записи</p>
+      <div id="tx-list"></div>
+      <p class="empty-msg" id="empty-list" style="display:none;">Поки що немає записів.<br>Додай перший у вкладці "Додати".</p>
+    </div>
+
+    <!-- ACCOUNTS VIEW -->
+    <div class="view" id="view-accounts">
+      <div id="accounts-empty-banner"></div>
+      <div id="accounts-total-card"></div>
+
+      <p class="bank-group-title" style="margin-top:4px;">Готівка</p>
+      <div id="cash-balance-card"></div>
+
+      <p class="bank-group-title">Банки</p>
+      <div id="bank-group-selector"></div>
+      <div id="bank-group-detail"></div>
+
+      <p class="bank-group-title">Криптовалюта</p>
+      <div id="crypto-balance-card"></div>
+
+      <p class="bank-group-title">Заощадження</p>
+      <div id="savings-balance-card"></div>
+
+      <p class="bank-group-title">Очікувані повернення та борги</p>
+      <div id="owed-balance-card"></div>
+    </div>
+
+    <!-- ADD VIEW -->
+    <div class="view" id="view-add">
+      <div class="type-toggle">
+        <button id="type-expense">Витрата</button>
+        <button id="type-income">Дохід</button>
+      </div>
+
+      <p class="field-label">Сума</p>
+      <div class="amount-row">
+        <input type="text" id="amount" placeholder="0,00" inputmode="decimal">
+        <select id="currency">
+          <option value="EUR">EUR</option>
+          <option value="UAH">UAH</option>
+          <option value="USD">USD</option>
+          <option value="PLN">PLN</option>
+        </select>
+      </div>
+
+      <p class="field-label">Рахунок</p>
+      <select id="account-select" class="account-select-prominent" style="width:100%; margin-bottom:4px;"></select>
+      <p style="font-size:12px; color:var(--text-muted); margin:0 0 16px;">Натисни, щоб обрати готівку, банк або гаманець</p>
+
+      <p class="field-label">Категорія</p>
+      <div class="cat-grid" id="cat-grid"></div>
+
+      <div id="subcat-wrap" style="display:none;">
+        <p class="field-label">Уточнення</p>
+        <div class="cat-grid" id="subcat-grid" style="grid-template-columns: repeat(3, 1fr);"></div>
+      </div>
+
+      <p class="field-label">Дата</p>
+      <input type="date" id="date">
+
+      <p class="field-label">Коментар (опційно)</p>
+      <input type="text" id="note" placeholder="Наприклад, кава з колегами">
+
+      <button class="save-btn" id="save-btn">Зберегти запис</button>
+      <p class="save-msg" id="save-msg"></p>
+    </div>
+
+  </main>
+
+  <nav class="tabbar">
+    <button class="tab active" data-view="stats">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M4 19V11M12 19V5M20 19V14" stroke-linecap="round" stroke-linejoin="round"/></svg>
+      Статистика
+    </button>
+    <button class="tab" data-view="add">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="12" cy="12" r="9"/><path d="M12 8v8M8 12h8" stroke-linecap="round"/></svg>
+      Додати
+    </button>
+    <button class="tab" data-view="list">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M4 6h16M4 12h16M4 18h10" stroke-linecap="round"/></svg>
+      Записи
+    </button>
+    <button class="tab" data-view="accounts">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="3" y="6" width="18" height="13" rx="2"/><path d="M3 10h18" stroke-linecap="round"/></svg>
+      Рахунки
+    </button>
+  </nav>
+</div>
+
+<script>
+(function() {
+  const SUPABASE_URL = 'https://uggfmsuchrmotkfqddfk.supabase.co';
+  const SUPABASE_KEY = 'sb_publishable_5HQs-X6XQJONUWIFXZUl0Q_yk8_USMb';
+  const sb = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+
+  let currentUser = null;
+  let authMode = 'login';
+
+  const CATEGORIES = {
+    expense: [
+      {id:'food', name:'Їжа', em:'🍽️'},
+      {id:'transport', name:'Транспорт', em:'🚗'},
+      {id:'housing', name:'Житло', em:'🏠'},
+      {id:'kids', name:'Діти', em:'🧸'},
+      {id:'fun', name:'Розваги', em:'🎮'},
+      {id:'clothes', name:'Одяг', em:'👕'},
+      {id:'health', name:'Здоров\'я', em:'💊'},
+      {id:'rest', name:'Відпочинок', em:'🏖️'},
+      {id:'subscriptions', name:'Підписки', em:'🔁'},
+      {id:'education', name:'Освіта', em:'📚'},
+      {id:'documents', name:'Документи/візи', em:'📄'},
+      {id:'gifts', name:'Подарунки', em:'🎁'},
+      {id:'charity', name:'Благодійність', em:'❤️'},
+      {id:'connection', name:'Звʼязок', em:'📶'},
+      {id:'self_care', name:'Догляд за собою', em:'🧴'},
+      {id:'household', name:'Побут та дім', em:'🧹'},
+      {id:'pets', name:'Тварини', em:'🐾'},
+      {id:'savings', name:'Заощадження', em:'💎', subcats:[
+        {id:'savings_home', name:'На житло'},
+        {id:'savings_reserve', name:'Резерв'},
+        {id:'savings_education', name:'На навчання'},
+        {id:'savings_car', name:'Авто'},
+        {id:'savings_rest', name:'Відпочинок'},
+        {id:'savings_renovation', name:'Ремонт'},
+        {id:'savings_other', name:'Інше'}
+      ]},
+      {id:'obligations', name:'Зобовʼязання', em:'🏦', subcats:[
+        {id:'obligation_loan', name:'Кредит'},
+        {id:'obligation_debt', name:'Борг'},
+        {id:'obligation_lease', name:'Лізинг/розстрочка'}
+      ]},
+      {id:'other_expense', name:'Інше', em:'➕', wide:true}
+    ],
+    income: [
+      {id:'income', name:'Зарплата', em:'💰'},
+      {id:'side_job', name:'Підробіток', em:'🛠️'},
+      {id:'freelance', name:'Фриланс', em:'💻'},
+      {id:'gift_money', name:'Подарунок грошима', em:'🎁'},
+      {id:'deposit_interest', name:'Відсотки депозиту', em:'🏦'},
+      {id:'cashback', name:'Кешбек', em:'💳'},
+      {id:'investment', name:'Інвестиції', em:'📈'},
+      {id:'sale', name:'Продаж речей', em:'🏷️'},
+      {id:'returns', name:'Очікувані повернення', em:'↩️'},
+      {id:'other_income', name:'Інше', em:'➕', wide:true}
+    ]
+  };
+  const CURRENCIES = ['EUR','UAH','USD','PLN'];
+  const SYMS = {EUR:'€', UAH:'₴', USD:'$', PLN:'zł', BTC:'₿', ETH:'Ξ', USDT:'₮', SOL:'◎', XRP:'XRP', TRUMP:'TRUMP'};
+  function fmtAmount(currency, amount) {
+    const sym = SYMS[currency];
+    if (!sym) return fmt(amount) + ' ' + currency;
+    // For crypto, show amount first then symbol
+    if (CRYPTO.includes(currency)) return fmt(amount) + ' ' + currency;
+    return sym + fmt(amount);
+  }
+  const CRYPTO = ['TRUMP','BTC','ETH','USDT','SOL','XRP'];
+  const CRYPTO_SYMS = {TRUMP:'TRUMP', BTC:'₿', ETH:'Ξ', USDT:'₮', SOL:'◎', XRP:'XRP'};
+
+  const BANK_GROUPS = [
+    { title: 'Україна', banks: [
+      {id:'mono', name:'Monobank'},
+      {id:'privat', name:'ПриватБанк'},
+      {id:'oschad', name:'Ощадбанк'},
+      {id:'sense', name:'Sense Bank'},
+      {id:'raiffeisen', name:'Райффайзен Банк'},
+      {id:'pumb', name:'ПУМБ'},
+      {id:'ukrsibb', name:'Укрсиббанк'},
+      {id:'ukrexim', name:'Укрексімбанк'},
+      {id:'abank', name:'А-Банк'}
+    ]},
+    { title: 'Польща', banks: [
+      {id:'pkobp', name:'PKO BP'},
+      {id:'mbank', name:'mBank'},
+      {id:'santander_pl', name:'Santander'},
+      {id:'ing_pl', name:'ING'}
+    ]},
+    { title: 'США', banks: [
+      {id:'chase', name:'Chase'},
+      {id:'boa', name:'Bank of America'},
+      {id:'wellsfargo', name:'Wells Fargo'},
+      {id:'citi', name:'Citibank'}
+    ]},
+    { title: 'Європа', banks: [
+      {id:'deutsche', name:'Deutsche Bank'},
+      {id:'bnp', name:'BNP Paribas'},
+      {id:'ing_eu', name:'ING'},
+      {id:'santander_es', name:'Santander (Іспанія)'}
+    ]},
+    { title: 'Португалія', banks: [
+      {id:'cgd', name:'Caixa Geral de Depósitos'},
+      {id:'millennium_bcp', name:'Millennium BCP'},
+      {id:'santander_pt', name:'Santander Totta'},
+      {id:'novobanco', name:'Novo Banco'}
+    ]},
+    { title: 'Сервіси', banks: [
+      {id:'wise', name:'Wise'},
+      {id:'revolut', name:'Revolut'}
+    ]}
+  ];
+  function allBanks() { return BANK_GROUPS.flatMap(g => g.banks); }
+  function bankName(id) { const b = allBanks().find(b => b.id === id); return b ? b.name : id; }
+  function accountDisplayName(accId) {
+    // Legacy values
+    if (accId === 'cash') return '💵 Готівка';
+    if (accId === 'crypto') return '🪙 Крипто';
+    if (accId === 'bank') return 'Банк';
+    // New: uuid of named account
+    const acc = state.accounts.find(a => a.id === accId);
+    if (acc) {
+      const bankLabel = acc.bankId === 'cash' ? 'Готівка' :
+                        acc.bankId === 'crypto' ? 'Крипто' :
+                        bankName(acc.bankId);
+      return acc.name !== 'Основний' ? bankLabel + ' · ' + acc.name : bankLabel;
+    }
+    // Fallback: might be a bank_id from legacy
+    return bankName(accId) || accId;
+  }
+
+  let state = { transactions: [], balances: {}, accounts: [], currentType: 'expense', currentAccount: null, period: 'month', statsCurrency: 'UAH', accountsCurrency: 'UAH', budgetLimit: null, budgetLimitCurrency: 'UAH' };
+  let rates = { EUR: null, USD: null, fetchedAt: null };
+  const RATES_KEY = 'fx_rates_cache';
+  let cryptoRates = { BTC: null, ETH: null, USDT: null, SOL: null, XRP: null, TRUMP: null, fetchedAt: null };
+  const CRYPTO_RATES_KEY = 'crypto_rates_cache';
+
+  async function loadCryptoRates() {
+    try {
+      const cached = localStorage.getItem(CRYPTO_RATES_KEY);
+      if (cached) {
+        const parsed = JSON.parse(cached);
+        const ageMinutes = (Date.now() - parsed.fetchedAt) / 60000;
+        if (ageMinutes < 30) { cryptoRates = parsed; return; }
+      }
+    } catch (e) {}
+    await fetchCryptoRates();
+  }
+
+  async function fetchCryptoRates() {
+    try {
+      const res = await fetch('https://api.coingecko.com/api/v3/simple/price?ids=bitcoin,ethereum,tether,solana,ripple,official-trump&vs_currencies=usd');
+      if (!res.ok) throw new Error('bad status ' + res.status);
+      const data = await res.json();
+      cryptoRates = {
+        BTC: data.bitcoin ? data.bitcoin.usd : null,
+        ETH: data.ethereum ? data.ethereum.usd : null,
+        USDT: data.tether ? data.tether.usd : null,
+        SOL: data.solana ? data.solana.usd : null,
+        XRP: data.ripple ? data.ripple.usd : null,
+        TRUMP: data['official-trump'] ? data['official-trump'].usd : null,
+        fetchedAt: Date.now()
+      };
+      localStorage.setItem(CRYPTO_RATES_KEY, JSON.stringify(cryptoRates));
+    } catch (e) {
+      console.log('crypto rates error', e.message);
+      try {
+        const cached = localStorage.getItem(CRYPTO_RATES_KEY);
+        if (cached) cryptoRates = JSON.parse(cached);
+      } catch (e2) {}
+    }
+  }
+
+  // converts a crypto amount to UAH using crypto->USD and USD->UAH rates
+  function cryptoToUah(symbol, amount) {
+    if (!cryptoRates[symbol] || !rates.USD) return 0;
+    return amount * cryptoRates[symbol] * rates.USD;
+  }
+
+  // converts an amount in `currency` to UAH
+  function toUahAmount(currency, amount) {
+    if (currency === 'UAH') return amount;
+    if (currency === 'EUR') return rates.EUR ? amount * rates.EUR : null;
+    if (currency === 'USD') return rates.USD ? amount * rates.USD : null;
+    if (currency === 'PLN') return rates.PLN ? amount * rates.PLN : null;
+    return null;
+  }
+
+  // converts an amount already in UAH to the target currency
+  function fromUahAmount(uahAmount, targetCurrency) {
+    if (targetCurrency === 'UAH') return uahAmount;
+    if (targetCurrency === 'EUR') return rates.EUR ? uahAmount / rates.EUR : null;
+    if (targetCurrency === 'USD') return rates.USD ? uahAmount / rates.USD : null;
+    if (targetCurrency === 'PLN') return rates.PLN ? uahAmount / rates.PLN : null;
+    return null;
+  }
+
+  // converts an amount from one currency directly to another (via UAH)
+  function convertAmount(amount, fromCurrency, toCurrency) {
+    if (fromCurrency === toCurrency) return amount;
+    const uah = toUahAmount(fromCurrency, amount);
+    if (uah === null) return null;
+    return fromUahAmount(uah, toCurrency);
+  }
+
+  async function loadRates() {
+    try {
+      const cached = localStorage.getItem(RATES_KEY);
+      if (cached) {
+        const parsed = JSON.parse(cached);
+        const ageHours = (Date.now() - parsed.fetchedAt) / 3600000;
+        if (ageHours < 12) { rates = parsed; return; }
+      }
+    } catch (e) {}
+    await fetchRates();
+  }
+
+  async function fetchRates() {
+    let ok = await tryNbu();
+    if (!ok) {
+      console.log('NBU failed, trying fallback...');
+      ok = await tryExchangeRateApi();
+    }
+    if (!ok) {
+      console.log('Both rate sources failed.');
+      try {
+        const cached = localStorage.getItem(RATES_KEY);
+        if (cached) rates = JSON.parse(cached);
+      } catch (e2) {}
+    } else {
+      console.log('Rates loaded:', rates);
+    }
+  }
+
+  async function tryNbu() {
+    try {
+      const res = await fetch('https://bank.gov.ua/NBUStatService/v1/statdirectory/exchange?json');
+      if (!res.ok) { console.log('NBU bad status', res.status); return false; }
+      const data = await res.json();
+      const eurRow = data.find(r => r.cc === 'EUR');
+      const usdRow = data.find(r => r.cc === 'USD');
+      const plnRow = data.find(r => r.cc === 'PLN');
+      if (!eurRow || !usdRow) { console.log('NBU missing currency rows'); return false; }
+      rates = { EUR: eurRow.rate, USD: usdRow.rate, PLN: plnRow ? plnRow.rate : null, fetchedAt: Date.now() };
+      localStorage.setItem(RATES_KEY, JSON.stringify(rates));
+      return true;
+    } catch (e) { console.log('NBU error', e.message); return false; }
+  }
+
+  async function tryExchangeRateApi() {
+    try {
+      const res = await fetch('https://open.er-api.com/v6/latest/USD');
+      if (!res.ok) { console.log('er-api bad status', res.status); return false; }
+      const data = await res.json();
+      if (!data.rates || !data.rates.UAH || !data.rates.EUR) { console.log('er-api missing rates', data); return false; }
+      const usdToUah = data.rates.UAH;
+      const usdToEur = data.rates.EUR;
+      const usdToPln = data.rates.PLN;
+      rates = {
+        USD: usdToUah,
+        EUR: usdToUah / usdToEur,
+        PLN: usdToPln ? usdToUah / usdToPln : null,
+        fetchedAt: Date.now()
+      };
+      localStorage.setItem(RATES_KEY, JSON.stringify(rates));
+      return true;
+    } catch (e) { console.log('er-api error', e.message); return false; }
+  }
+
+  function allCats() { return [...CATEGORIES.expense, ...CATEGORIES.income]; }
+  function catInfo(id) { return allCats().find(c => c.id === id) || {name:id, em:'•'}; }
+  function subcatName(catId, subcatId) {
+    if (!subcatId) return null;
+    const cat = allCats().find(c => c.id === catId);
+    if (!cat || !cat.subcats) return null;
+    const sc = cat.subcats.find(s => s.id === subcatId);
+    return sc ? sc.name : null;
+  }
+  function fmt(n) { return Number(n).toLocaleString('uk-UA', {minimumFractionDigits:2, maximumFractionDigits:2}); }
+
+  // ---- storage (Supabase, per-user) ----
+  async function loadData() {
+    if (!currentUser) { state.transactions = []; renderAll(); return; }
+    try {
+      const { data, error } = await sb
+        .from('transactions')
+        .select('*')
+        .order('date', { ascending: false });
+      if (error) throw error;
+      state.transactions = (data || []).map(row => ({
+        id: row.id,
+        type: row.type,
+        amount: Number(row.amount),
+        currency: row.currency,
+        account: row.account,
+        category: row.category,
+        subcategory: row.subcategory || null,
+        note: row.note || '',
+        date: row.date
+      }));
+    } catch (e) {
+      console.log('loadData error', e.message);
+      state.transactions = [];
+    }
+    renderAll();
+  }
+
+  async function insertTransaction(tx) {
+    if (!currentUser) return false;
+    try {
+      const { data, error } = await sb
+        .from('transactions')
+        .insert({
+          user_id: currentUser.id,
+          type: tx.type,
+          amount: tx.amount,
+          currency: tx.currency,
+          account: tx.account,
+          category: tx.category,
+          subcategory: tx.subcategory || null,
+          note: tx.note,
+          date: tx.date
+        })
+        .select()
+        .single();
+      if (error) throw error;
+      const newTx = {
+        id: data.id, type: data.type, amount: Number(data.amount),
+        currency: data.currency, account: data.account, category: data.category,
+        subcategory: data.subcategory || null,
+        note: data.note || '', date: data.date
+      };
+      state.transactions.push(newTx);
+
+      // Очікувані повернення / борги — це ще не здійснені рухи коштів, баланс рахунку не чіпаємо
+      if (!isPendingTx(newTx)) {
+        const delta = newTx.type === 'income' ? newTx.amount : -newTx.amount;
+        // newTx.account зберігає account_id (uuid) конкретного рахунку
+        await adjustBalance(newTx.account, delta);
+      }
+
+      return true;
+    } catch (e) {
+      console.log('insertTransaction error', e.message);
+      return false;
+    }
+  }
+
+  async function deleteTransaction(id) {
+    try {
+      const tx = state.transactions.find(t => String(t.id) === String(id));
+      const { error } = await sb.from('transactions').delete().eq('id', id);
+      if (error) throw error;
+      state.transactions = state.transactions.filter(t => String(t.id) !== String(id));
+
+      // Скасовуємо вплив видаленої транзакції на баланс рахунку (якщо вона на нього впливала)
+      if (tx && !isPendingTx(tx)) {
+        const delta = tx.type === 'income' ? -Number(tx.amount) : Number(tx.amount);
+        await adjustBalance(tx.account, delta);
+      }
+
+      return true;
+    } catch (e) {
+      console.log('deleteTransaction error', e.message);
+      return false;
+    }
+  }
+
+  async function loadBalances() {
+    if (!currentUser) { state.balances = {}; state.accounts = []; return; }
+    try {
+      const { data, error } = await sb.from('account_balances').select('*');
+      if (error) throw error;
+      // Зберігаємо повний список іменованих рахунків
+      state.accounts = (data || []).map(row => ({
+        id: row.id,
+        bankId: row.bank_id,
+        name: row.account_name || 'Основний',
+        type: row.account_type || 'debit',
+        currency: row.currency,
+        balance: Number(row.balance)
+      }));
+      // Агрегований балансовий словник для статистики/конвертації
+      state.balances = {};
+      state.accounts.forEach(acc => {
+        if (!state.balances[acc.bankId]) state.balances[acc.bankId] = {};
+        state.balances[acc.bankId][acc.currency] = (state.balances[acc.bankId][acc.currency] || 0) + acc.balance;
+      });
+    } catch (e) {
+      console.log('loadBalances error', e.message);
+      state.balances = {};
+      state.accounts = [];
+    }
+  }
+
+  async function loadBudgetLimit() {
+    if (!currentUser) return;
+    try {
+      const { data, error } = await sb.from('user_settings').select('*').eq('user_id', currentUser.id).maybeSingle();
+      if (error) throw error;
+      if (data) {
+        state.budgetLimit = data.monthly_budget_limit !== null ? Number(data.monthly_budget_limit) : null;
+        state.budgetLimitCurrency = data.monthly_budget_currency || 'UAH';
+      } else {
+        state.budgetLimit = null;
+        state.budgetLimitCurrency = 'UAH';
+      }
+    } catch (e) {
+      console.log('loadBudgetLimit error', e.message);
+    }
+  }
+
+  async function saveBudgetLimit(amount, currency) {
+    if (!currentUser) return false;
+    try {
+      const { error } = await sb.from('user_settings').upsert({
+        user_id: currentUser.id,
+        monthly_budget_limit: amount,
+        monthly_budget_currency: currency,
+        updated_at: new Date().toISOString()
+      }, { onConflict: 'user_id' });
+      if (error) throw error;
+      state.budgetLimit = amount;
+      state.budgetLimitCurrency = currency;
+      return true;
+    } catch (e) {
+      console.log('saveBudgetLimit error', e.message);
+      return false;
+    }
+  }
+
+  // Зберігає або оновлює іменований рахунок
+  async function saveBalance(bankId, currency, value, accName = 'Основний', accType = 'debit', existingId = null) {
+    if (!currentUser) return false;
+    try {
+      let resId = existingId;
+      let error;
+      if (existingId) {
+        const res = await sb.from('account_balances').update({
+          balance: value, account_name: accName, account_type: accType,
+          updated_at: new Date().toISOString()
+        }).eq('id', existingId);
+        error = res.error;
+      } else {
+        const res = await sb.from('account_balances').insert({
+          user_id: currentUser.id, bank_id: bankId, currency, balance: value,
+          account_name: accName, account_type: accType, updated_at: new Date().toISOString()
+        }).select().single();
+        error = res.error;
+        if (!error && res.data) resId = res.data.id;
+      }
+      if (error) throw error;
+      const idx = state.accounts.findIndex(a => a.id === resId);
+      if (idx >= 0) {
+        state.accounts[idx].balance = value;
+        state.accounts[idx].name = accName;
+        state.accounts[idx].type = accType;
+      } else {
+        state.accounts.push({ id: resId, bankId, name: accName, type: accType, currency, balance: value });
+      }
+      rebuildAggregateBalances();
+      return resId || true;
+    } catch (e) {
+      console.log('saveBalance error', e.message);
+      return false;
+    }
+  }
+
+  function rebuildAggregateBalances() {
+    state.balances = {};
+    state.accounts.forEach(acc => {
+      if (!state.balances[acc.bankId]) state.balances[acc.bankId] = {};
+      state.balances[acc.bankId][acc.currency] = (state.balances[acc.bankId][acc.currency] || 0) + acc.balance;
+    });
+  }
+
+  async function deleteAccount(accountId) {
+    if (!currentUser) return false;
+    try {
+      const { error } = await sb.from('account_balances').delete().eq('id', accountId);
+      if (error) throw error;
+      state.accounts = state.accounts.filter(a => a.id !== accountId);
+      rebuildAggregateBalances();
+      return true;
+    } catch (e) { console.log('deleteAccount error', e.message); return false; }
+  }
+
+  async function adjustBalance(accountId, delta) {
+    if (!currentUser) return false;
+    const acc = state.accounts.find(a => a.id === accountId);
+    if (!acc) return false;
+    try {
+      const newValue = acc.balance + delta;
+      const { error } = await sb.from('account_balances').update({
+        balance: newValue, updated_at: new Date().toISOString()
+      }).eq('id', accountId);
+      if (error) throw error;
+      acc.balance = newValue;
+      rebuildAggregateBalances();
+      return true;
+    } catch (e) { console.log('adjustBalance error', e.message); return false; }
+  }
+
+  // ---- date helpers ----
+  function startOfPeriod(period, ref) {
+    const d = new Date(ref);
+    d.setHours(0,0,0,0);
+    if (period === 'day') return d;
+    if (period === 'week') {
+      const day = d.getDay() === 0 ? 7 : d.getDay();
+      d.setDate(d.getDate() - day + 1);
+      return d;
+    }
+    if (period === 'month') { d.setDate(1); return d; }
+    if (period === 'year') { d.setMonth(0,1); return d; }
+  }
+  function endOfPeriod(period, ref) {
+    const start = startOfPeriod(period, ref);
+    const d = new Date(start);
+    if (period === 'day') d.setDate(d.getDate()+1);
+    if (period === 'week') d.setDate(d.getDate()+7);
+    if (period === 'month') d.setMonth(d.getMonth()+1);
+    if (period === 'year') d.setFullYear(d.getFullYear()+1);
+    return d;
+  }
+  function periodLabel(period) {
+    const now = new Date();
+    if (period === 'day') return now.toLocaleDateString('uk-UA', {day:'numeric', month:'long', year:'numeric'});
+    if (period === 'week') {
+      const s = startOfPeriod('week', now), e = new Date(endOfPeriod('week', now)); e.setDate(e.getDate()-1);
+      return s.toLocaleDateString('uk-UA',{day:'numeric',month:'short'}) + ' — ' + e.toLocaleDateString('uk-UA',{day:'numeric',month:'short'});
+    }
+    if (period === 'month') return now.toLocaleDateString('uk-UA', {month:'long', year:'numeric'});
+    if (period === 'year') return now.getFullYear().toString();
+  }
+  function txInPeriod(tx, period) {
+    const now = new Date();
+    const s = startOfPeriod(period, now), e = endOfPeriod(period, now);
+    const td = new Date(tx.date + 'T00:00:00');
+    return td >= s && td < e;
+  }
+
+  // "Очікувані повернення" та "Борг" — це ще не здійснені рухи коштів.
+  // Вони показуються окремо (зелена/червона картка) і не входять у фактичний баланс.
+  function isPendingTx(tx) {
+    if (tx.category === 'returns') return true;
+    if (tx.category === 'obligations' && tx.subcategory === 'obligation_debt') return true;
+    return false;
+  }
+
+  // ---- view switching ----
+  function switchView(view) {
+    document.querySelectorAll('.view').forEach(v => v.classList.remove('active'));
+    document.getElementById('view-' + view).classList.add('active');
+    document.querySelectorAll('.tab').forEach(t => t.classList.toggle('active', t.dataset.view === view));
+    const titles = {stats:'Бюджет', add:'Новий запис', list:'Всі записи', accounts:'Рахунки'};
+    document.getElementById('header-title').textContent = titles[view];
+    if (view === 'stats') renderStats();
+    if (view === 'list') { renderFilterChips(); renderList(); }
+    if (view === 'accounts') renderAccounts();
+  }
+
+  // ---- add form ----
+  const CAT_HIGHLIGHT = {
+    savings: 'cat-highlight-savings',
+    obligations: 'cat-highlight-obligations',
+    returns: 'cat-highlight-returns'
+  };
+
+  function renderCatGrid() {
+    const grid = document.getElementById('cat-grid');
+    grid.innerHTML = '';
+    CATEGORIES[state.currentType].forEach((c, i) => {
+      const btn = document.createElement('button');
+      btn.className = 'cat-pick' + (i === 0 ? ' active' : '');
+      if (c.wide) {
+        btn.className += ' cat-pick-wide';
+        btn.style.gridColumn = '1 / -1';
+      }
+      if (CAT_HIGHLIGHT[c.id]) btn.className += ' ' + CAT_HIGHLIGHT[c.id];
+      btn.dataset.cat = c.id;
+      btn.innerHTML = '<span class="em">' + c.em + '</span><span>' + c.name + '</span>';
+      btn.addEventListener('click', () => {
+        grid.querySelectorAll('.cat-pick').forEach(b => b.classList.remove('active'));
+        btn.classList.add('active');
+        renderSubcatGrid(c);
+      });
+      grid.appendChild(btn);
+    });
+    renderSubcatGrid(CATEGORIES[state.currentType][0]);
+  }
+
+  function renderSubcatGrid(category) {
+    const wrap = document.getElementById('subcat-wrap');
+    const grid = document.getElementById('subcat-grid');
+    if (!category.subcats || category.subcats.length === 0) {
+      wrap.style.display = 'none';
+      grid.innerHTML = '';
+      return;
+    }
+    wrap.style.display = 'block';
+    grid.innerHTML = '';
+    category.subcats.forEach((sc, i) => {
+      const btn = document.createElement('button');
+      btn.className = 'cat-pick' + (i === 0 ? ' active' : '');
+      btn.dataset.subcat = sc.id;
+      btn.innerHTML = '<span>' + sc.name + '</span>';
+      btn.addEventListener('click', () => {
+        grid.querySelectorAll('.cat-pick').forEach(b => b.classList.remove('active'));
+        btn.classList.add('active');
+      });
+      grid.appendChild(btn);
+    });
+  }
+  function setType(type) {
+    state.currentType = type;
+    document.getElementById('type-expense').className = type === 'expense' ? 'sel-out' : '';
+    document.getElementById('type-income').className = type === 'income' ? 'sel-in' : '';
+    renderCatGrid();
+  }
+
+  // ---- stats render ----
+  function renderBudgetLimitCard() {
+    const wrap = document.getElementById('budget-limit-card');
+
+    if (state.budgetLimit === null || state.budgetLimit === undefined) {
+      wrap.innerHTML = '<div class="budget-limit-card">' +
+        '<div class="title">Місячний ліміт витрат</div>' +
+        '<p style="font-size:13px; color:var(--text-secondary); margin:8px 0 10px;">Встанови ліміт, щоб бачити прогрес витрат за місяць.</p>' +
+        '<div class="budget-setup-row">' +
+          '<input type="text" inputmode="decimal" id="budget-limit-input" placeholder="Наприклад, 1000">' +
+          '<select id="budget-limit-currency">' + CURRENCIES.map(c => '<option value="' + c + '">' + c + '</option>').join('') + '</select>' +
+          '<button id="budget-limit-save">Встановити</button>' +
+        '</div>' +
+      '</div>';
+      document.getElementById('budget-limit-input').addEventListener('input', sanitizeAmountInput);
+      document.getElementById('budget-limit-save').addEventListener('click', async () => {
+        const val = parseFloat(document.getElementById('budget-limit-input').value.replace(',', '.'));
+        const cur = document.getElementById('budget-limit-currency').value;
+        if (!val || val <= 0) return;
+        await saveBudgetLimit(val, cur);
+        renderBudgetLimitCard();
+      });
+      return;
+    }
+
+    // Ліміт стосується лише місячних витрат — рахуємо за поточний календарний місяць незалежно від обраного періоду статистики
+    const now = new Date();
+    const monthStart = new Date(now.getFullYear(), now.getMonth(), 1);
+    const monthEnd = new Date(now.getFullYear(), now.getMonth() + 1, 1);
+    const monthTxs = state.transactions.filter(t => {
+      const d = new Date(t.date + 'T00:00:00');
+      return d >= monthStart && d < monthEnd && t.type === 'expense' && !isPendingTx(t);
+    });
+
+    let spent = 0;
+    let hasUnconverted = false;
+    monthTxs.forEach(t => {
+      const converted = convertAmount(Number(t.amount), t.currency, state.budgetLimitCurrency);
+      if (converted === null) { hasUnconverted = true; return; }
+      spent += converted;
+    });
+
+    const pct = Math.min(100, Math.round((spent / state.budgetLimit) * 100));
+    const over = spent > state.budgetLimit;
+    const barColor = over ? 'var(--danger)' : pct > 80 ? 'var(--accent)' : 'var(--success)';
+    const remaining = state.budgetLimit - spent;
+
+    wrap.innerHTML = '<div class="budget-limit-card">' +
+      '<div class="top-row">' +
+        '<span class="title">Місячний ліміт витрат</span>' +
+        '<button class="edit-link" id="budget-limit-edit">Змінити</button>' +
+      '</div>' +
+      '<div class="amounts">' +
+        '<span class="spent" style="color:' + (over ? 'var(--danger)' : 'var(--text-primary)') + '">' + SYMS[state.budgetLimitCurrency] + fmt(spent) + '</span>' +
+        '<span class="limit">з ' + SYMS[state.budgetLimitCurrency] + fmt(state.budgetLimit) + '</span>' +
+      '</div>' +
+      '<div class="budget-progress-track"><div class="budget-progress-fill" style="width:' + pct + '%; background:' + barColor + ';"></div></div>' +
+      '<div class="remaining">' +
+        (over
+          ? 'Перевищено на ' + SYMS[state.budgetLimitCurrency] + fmt(Math.abs(remaining))
+          : 'Залишилось ' + SYMS[state.budgetLimitCurrency] + fmt(remaining)) +
+        (hasUnconverted ? ' · деякі суми не вдалось конвертувати' : '') +
+      '</div>' +
+    '</div>';
+
+    document.getElementById('budget-limit-edit').addEventListener('click', () => {
+      state.budgetLimit = null;
+      renderBudgetLimitCard();
+    });
+  }
+
+  function renderOwedStatsCards() {
+    const wrap = document.getElementById('owed-stats-cards');
+
+    // За весь час — без фільтру по periodLabel
+    const returnTxs = state.transactions.filter(t =>
+      t.category === 'returns' && t.type === 'income'
+    );
+    const owedToMe = {};
+    returnTxs.forEach(t => {
+      owedToMe[t.currency] = (owedToMe[t.currency] || 0) + Number(t.amount);
+    });
+
+    // "Винен я" — за весь час
+    const debtTxs = state.transactions.filter(t =>
+      t.category === 'obligations' && t.subcategory === 'obligation_debt' && t.type === 'expense'
+    );
+    const owedByMe = {};
+    debtTxs.forEach(t => {
+      owedByMe[t.currency] = (owedByMe[t.currency] || 0) + Number(t.amount);
+    });
+
+    const toMeParts = CURRENCIES.filter(c => owedToMe[c]).map(c => SYMS[c] + fmt(owedToMe[c]));
+    const byMeParts = CURRENCIES.filter(c => owedByMe[c]).map(c => SYMS[c] + fmt(owedByMe[c]));
+
+    if (toMeParts.length === 0 && byMeParts.length === 0) {
+      wrap.innerHTML = '';
+      return;
+    }
+
+    const targetCur = state.statsCurrency;
+    function totalInTarget(bal) {
+      let sum = 0;
+      let ok = true;
+      CURRENCIES.forEach(c => {
+        if (!bal[c]) return;
+        const converted = convertAmount(bal[c], c, targetCur);
+        if (converted === null) { ok = false; return; }
+        sum += converted;
+      });
+      return ok ? sum : null;
+    }
+    const toMeTotal = totalInTarget(owedToMe);
+    const byMeTotal = totalInTarget(owedByMe);
+
+    wrap.innerHTML = '<div class="owed-stats-grid">' +
+      '<div class="owed-card owed-to-me">' +
+        '<div class="label">Винні мені (всього)</div>' +
+        '<div class="value">' + (toMeParts.length ? toMeParts.join(' · ') : '—') + '</div>' +
+        (toMeTotal !== null && toMeParts.length ? '<div style="font-size:11px; color:rgba(255,255,255,0.7); margin-top:6px;">≈ ' + SYMS[targetCur] + fmt(toMeTotal) + '</div>' : '') +
+      '</div>' +
+      '<div class="owed-card owed-by-me">' +
+        '<div class="label">Винен я (всього)</div>' +
+        '<div class="value">' + (byMeParts.length ? byMeParts.join(' · ') : '—') + '</div>' +
+        (byMeTotal !== null && byMeParts.length ? '<div style="font-size:11px; color:rgba(255,255,255,0.7); margin-top:6px;">≈ ' + SYMS[targetCur] + fmt(byMeTotal) + '</div>' : '') +
+      '</div>' +
+    '</div>';
+  }
+
+  function renderTotalUah() {
+    const card = document.getElementById('total-uah-card');
+    const txs = state.transactions.filter(t => txInPeriod(t, state.period));
+    const targetCur = state.statsCurrency;
+
+    let total = 0;
+    let hasRates = rates.EUR && rates.USD;
+
+    txs.forEach(t => {
+      if (isPendingTx(t)) return;
+      const converted = convertAmount(Number(t.amount), t.currency, targetCur);
+      if (converted === null) return;
+      total += t.type === 'income' ? converted : -converted;
+    });
+
+    const currencySelector = '<select class="stats-currency-select" id="stats-currency-select">' +
+      CURRENCIES.map(c => '<option value="' + c + '"' + (c === targetCur ? ' selected' : '') + '>' + c + '</option>').join('') +
+    '</select>';
+
+    if (!hasRates) {
+      card.innerHTML = '<div class="label">Загалом ' + currencySelector + ' <button class="refresh-rate-btn" id="refresh-rate">Оновити курс</button></div>' +
+        '<div class="value" style="color:var(--text-muted); font-size:15px;">Курс недоступний — перевір інтернет</div>';
+    } else {
+      const color = total >= 0 ? 'var(--success)' : 'var(--danger)';
+      const updated = rates.fetchedAt ? new Date(rates.fetchedAt).toLocaleString('uk-UA', {day:'numeric', month:'short', hour:'2-digit', minute:'2-digit'}) : '';
+      card.innerHTML = '<div class="label">Загалом ' + currencySelector + ' <button class="refresh-rate-btn" id="refresh-rate">Оновити курс</button></div>' +
+        '<div class="value" style="color:' + color + '">' + (total>=0?'+':'') + SYMS[targetCur] + fmt(total) + '</div>' +
+        '<div class="rate-info">1 EUR ≈ ' + fmt(rates.EUR) + ' ₴ · 1 USD ≈ ' + fmt(rates.USD) + ' ₴' + (rates.PLN ? ' · 1 PLN ≈ ' + fmt(rates.PLN) + ' ₴' : '') + ' · оновлено ' + updated + '</div>';
+    }
+
+    const selectEl = document.getElementById('stats-currency-select');
+    if (selectEl) selectEl.addEventListener('change', () => {
+      state.statsCurrency = selectEl.value;
+      renderStats();
+    });
+
+    const btn = document.getElementById('refresh-rate');
+    if (btn) btn.addEventListener('click', async () => {
+      btn.textContent = 'Оновлюю…';
+      await fetchRates();
+      renderTotalUah();
+    });
+  }
+
+  function renderStats() {
+    renderTotalUah();
+    renderBudgetLimitCard();
+    renderOwedStatsCards();
+    document.getElementById('period-label').textContent = periodLabel(state.period);
+
+    const grid = document.getElementById('currency-grid');
+    grid.innerHTML = CURRENCIES.map(cur => {
+      const txs = state.transactions.filter(t => t.currency === cur && txInPeriod(t, state.period) && !isPendingTx(t));
+      const income = txs.filter(t=>t.type==='income').reduce((s,t)=>s+Number(t.amount),0);
+      const expense = txs.filter(t=>t.type==='expense').reduce((s,t)=>s+Number(t.amount),0);
+      const balance = income - expense;
+      const balColor = balance > 0 ? 'var(--success)' : balance < 0 ? 'var(--danger)' : 'var(--text-primary)';
+      return '<div class="currency-card">' +
+        '<div class="cur">' + cur + '</div>' +
+        '<div class="balance" style="color:' + balColor + '">' + (balance>=0?'+':'') + SYMS[cur] + fmt(balance) + '</div>' +
+        '<div class="breakdown"><span class="in">+' + SYMS[cur] + fmt(income) + '</span><span class="out">-' + SYMS[cur] + fmt(expense) + '</span></div>' +
+      '</div>';
+    }).join('');
+
+    const catSection = document.getElementById('category-section');
+    const relevantCurs = CURRENCIES.filter(cur =>
+      state.transactions.some(t => t.currency === cur && t.type === 'expense' && txInPeriod(t, state.period))
+    );
+
+    if (relevantCurs.length === 0) {
+      catSection.innerHTML = '<p class="empty-msg">Немає витрат за цей період.</p>';
+      return;
+    }
+
+    let html = '<p class="section-title">Витрати по категоріях</p>';
+    relevantCurs.forEach(cur => {
+      const txs = state.transactions.filter(t => t.currency === cur && t.type === 'expense' && txInPeriod(t, state.period));
+      const total = txs.reduce((s,t)=>s+Number(t.amount),0);
+      html += '<p style="font-size:12px; color:var(--text-muted); margin:14px 0 8px;">' + cur + '</p>';
+      CATEGORIES.expense.forEach(cat => {
+        const sum = txs.filter(t=>t.category===cat.id).reduce((s,t)=>s+Number(t.amount),0);
+        if (sum === 0) return;
+        const pct = total > 0 ? Math.round((sum/total)*100) : 0;
+        html += '<div class="cat-row">' +
+          '<div class="top"><span class="name">' + cat.em + ' ' + cat.name + '</span><span class="amt">' + SYMS[cur] + fmt(sum) + ' · ' + pct + '%</span></div>' +
+          '<div class="bar-track"><div class="bar-fill" style="width:' + pct + '%"></div></div>' +
+        '</div>';
+      });
+    });
+    catSection.innerHTML = html;
+
+    // Реальні баланси по рахунках тепер на вкладці "Рахунки" — там вони автоматично
+    // коригуються кожною транзакцією. Тут просто прибираємо застарілий блок.
+    const accSection = document.getElementById('account-section');
+    accSection.innerHTML = '';
+  }
+
+  // ---- list render ----
+  let listFilter = { search: '', type: 'all' }; // type: all | expense | income
+
+  function renderFilterChips() {
+    const wrap = document.getElementById('tx-filter-chips');
+    const chips = [
+      {id:'all', label:'Усі'},
+      {id:'expense', label:'Витрати'},
+      {id:'income', label:'Доходи'}
+    ];
+    wrap.innerHTML = chips.map(c =>
+      '<button class="filter-chip' + (listFilter.type === c.id ? ' active' : '') + '" data-filter="' + c.id + '">' + c.label + '</button>'
+    ).join('');
+    wrap.querySelectorAll('[data-filter]').forEach(btn => {
+      btn.addEventListener('click', () => {
+        listFilter.type = btn.dataset.filter;
+        renderFilterChips();
+        renderList();
+      });
+    });
+  }
+
+  document.getElementById('tx-search').addEventListener('input', (e) => {
+    listFilter.search = e.target.value.trim().toLowerCase();
+    renderList();
+  });
+
+  function matchesFilter(tx) {
+    if (listFilter.type !== 'all' && tx.type !== listFilter.type) return false;
+    if (listFilter.search) {
+      const info = catInfo(tx.category);
+      const scName = subcatName(tx.category, tx.subcategory) || '';
+      const haystack = (info.name + ' ' + scName + ' ' + (tx.note || '') + ' ' + accountDisplayName(tx.account)).toLowerCase();
+      if (!haystack.includes(listFilter.search)) return false;
+    }
+    return true;
+  }
+
+  function renderList() {
+    const listEl = document.getElementById('tx-list');
+    const emptyEl = document.getElementById('empty-list');
+    const sorted = [...state.transactions]
+      .filter(matchesFilter)
+      .sort((a,b) => new Date(b.date) - new Date(a.date) || b.id - a.id);
+    if (sorted.length === 0) {
+      listEl.innerHTML = '';
+      emptyEl.style.display = 'block';
+      emptyEl.innerHTML = state.transactions.length === 0
+        ? 'Поки що немає записів.<br>Додай перший у вкладці "Додати".'
+        : 'Нічого не знайдено за цим фільтром.';
+      return;
+    }
+    emptyEl.style.display = 'none';
+    listEl.innerHTML = sorted.map(tx => {
+      const info = catInfo(tx.category);
+      const scName = subcatName(tx.category, tx.subcategory);
+      const displayName = scName ? info.name + ' · ' + scName : info.name;
+      const isIncome = tx.type === 'income';
+      const dateStr = new Date(tx.date + 'T00:00:00').toLocaleDateString('uk-UA', {day:'numeric', month:'short'});
+      const accLabel = accountDisplayName(tx.account);
+      return '<div class="tx-item">' +
+        '<div class="tx-left">' +
+          '<div class="tx-icon">' + info.em + '</div>' +
+          '<div><p class="tx-name">' + displayName + '</p>' +
+          '<p class="tx-meta">' + dateStr + ' · ' + accLabel + (tx.note ? ' · ' + escapeHtml(tx.note) : '') + '</p></div>' +
+        '</div>' +
+        '<div style="display:flex; align-items:center; gap:6px;">' +
+          '<span class="tx-amt ' + (isIncome?'in':'out') + '">' + (isIncome?'+':'-') + SYMS[tx.currency] + fmt(tx.amount) + '</span>' +
+          '<button class="del-btn" data-id="' + tx.id + '">✕</button>' +
+        '</div>' +
+      '</div>';
+    }).join('');
+
+    listEl.querySelectorAll('.del-btn').forEach(btn => {
+      btn.addEventListener('click', async () => {
+        const ok = await deleteTransaction(btn.dataset.id);
+        if (ok) { renderList(); renderStats(); }
+      });
+    });
+  }
+
+  // ---- accounts render ----
+  let accountFlowStep = null; // null | 'country' | 'bank'
+  let flowSelectedGroupIndex = null;
+
+  function groupTotalLabel(group) {
+    const sums = {EUR:0, UAH:0, USD:0, PLN:0};
+    group.banks.forEach(bank => {
+      const bal = state.balances[bank.id] || {};
+      CURRENCIES.forEach(c => { if (bal[c]) sums[c] += bal[c]; });
+    });
+    const parts = CURRENCIES.filter(c => sums[c] > 0).map(c => SYMS[c] + fmt(sums[c]));
+    return parts.length ? parts.join(' · ') : 'Порожньо';
+  }
+
+  function renderAccounts() {
+    renderAccountsEmptyBanner();
+    renderCashBalance();
+    renderCryptoBalance();
+    renderBankGroupSelector();
+    renderBankGroupDetail();
+    renderSavingsBalance();
+    renderOwedBalance();
+    renderAccountsTotal();
+  }
+
+  function renderAccountsEmptyBanner() {
+    const wrap = document.getElementById('accounts-empty-banner');
+    const hasAnyBalance = state.accounts.length > 0;
+    if (hasAnyBalance) {
+      wrap.innerHTML = '';
+      return;
+    }
+    wrap.innerHTML = '<div class="setup-banner">' +
+      '<div class="icon">👋</div>' +
+      '<div class="title">Заповни свої рахунки</div>' +
+      '<div class="desc">Додай поточні баланси готівки, банків чи криптогаманця — тоді весь застосунок одразу покаже актуальну картину.</div>' +
+    '</div>';
+  }
+
+  function renderSpecialAccountCard(wrap, bankId, icon, label, flowStep) {
+    const accs = state.accounts.filter(a => a.bankId === bankId);
+    const parts = [];
+    accs.forEach(a => { if (a.balance) parts.push(fmtAmount(a.currency, a.balance)); });
+
+    if (accountFlowStep === flowStep) {
+      const accountsHtml = accs.length
+        ? accs.map(acc => {
+            return '<div style="display:flex;align-items:center;gap:8px;margin-bottom:6px;">' +
+              '<span style="font-size:13px;color:var(--text-secondary);flex:1;">' + acc.name + ' (' + acc.currency + ')</span>' +
+              '<input type="text" inputmode="decimal" style="width:100px;" placeholder="0" value="' + (acc.balance || '') + '" data-acc-id="' + acc.id + '" data-acc-balance>' +
+              '<button class="edit-bank-btn" style="padding:6px 8px;background:var(--danger-bg);color:var(--danger);border-color:var(--danger);" data-del-id="' + acc.id + '">✕</button>' +
+            '</div>';
+          }).join('')
+        : '<p style="font-size:13px;color:var(--text-muted);margin:0 0 8px;">Немає записів.</p>';
+
+      const currOptions = bankId === 'crypto'
+        ? CRYPTO.map(c => '<option value="' + c + '">' + c + '</option>').join('')
+        : CURRENCIES.map(c => '<option value="' + c + '">' + c + '</option>').join('');
+
+      wrap.innerHTML = '<div class="bank-card">' +
+        '<div class="bank-head"><span class="bank-name">' + icon + ' ' + label + '</span></div>' +
+        accountsHtml +
+        '<div style="display:flex;gap:6px;margin-top:8px;">' +
+          '<input type="text" id="' + bankId + '-new-name" placeholder="Назва" style="flex:1;">' +
+          '<select id="' + bankId + '-new-cur">' + currOptions + '</select>' +
+          '<button class="save-btn" style="width:auto;margin:0;padding:0 14px;" id="' + bankId + '-new-add">+</button>' +
+        '</div>' +
+      '</div>' +
+      '<button class="group-back-btn" id="' + bankId + '-done">' +
+        '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M15 18l-6-6 6-6" stroke-linecap="round" stroke-linejoin="round"/></svg>Готово</button>';
+
+      wrap.querySelectorAll('[data-acc-balance]').forEach(inp => {
+        inp.addEventListener('change', async () => {
+          const val = parseFloat(inp.value.replace(',', '.')) || 0;
+          await saveBalance(null, null, val, null, null, inp.dataset.accId);
+          renderAccountsTotal();
+          populateAccountSelect();
+        });
+      });
+      wrap.querySelectorAll('[data-del-id]').forEach(btn => {
+        btn.addEventListener('click', async () => {
+          await deleteAccount(btn.dataset.delId);
+          renderSpecialAccountCard(wrap, bankId, icon, label, flowStep);
+          renderAccountsTotal();
+          populateAccountSelect();
+        });
+      });
+      const addBtn = document.getElementById(bankId + '-new-add');
+      if (addBtn) addBtn.addEventListener('click', async () => {
+        const name = document.getElementById(bankId + '-new-name').value.trim() || label;
+        const cur = document.getElementById(bankId + '-new-cur').value;
+        await saveBalance(bankId, cur, 0, name, 'other');
+        renderSpecialAccountCard(wrap, bankId, icon, label, flowStep);
+        renderAccountsTotal();
+        populateAccountSelect();
+      });
+      const doneBtn = document.getElementById(bankId + '-done');
+      if (doneBtn) doneBtn.addEventListener('click', () => {
+        accountFlowStep = null;
+        renderSpecialAccountCard(wrap, bankId, icon, label, flowStep);
+        renderBankGroupSelector();
+      });
+      return;
+    }
+
+    wrap.innerHTML = '<div class="bank-list-row">' +
+      '<div class="left-info"><span class="name">' + icon + ' ' + label + '</span>' +
+      '<span class="vals">' + (parts.length ? parts.join(' · ') : '—') + '</span></div>' +
+      '<button class="edit-bank-btn" id="' + bankId + '-edit-btn">Редагувати</button>' +
+    '</div>';
+
+    document.getElementById(bankId + '-edit-btn').addEventListener('click', () => {
+      accountFlowStep = flowStep;
+      renderSpecialAccountCard(wrap, bankId, icon, label, flowStep);
+      renderBankGroupSelector();
+    });
+  }
+
+  function renderCashBalance() {
+    const wrap = document.getElementById('cash-balance-card');
+    renderSpecialAccountCard(wrap, 'cash', '💵', 'Готівка', 'cash-edit');
+  }
+
+  function renderCryptoBalance() {
+    const wrap = document.getElementById('crypto-balance-card');
+    renderSpecialAccountCard(wrap, 'crypto', '🪙', 'Крипто', 'crypto-edit');
+  }
+
+  let savingsExpanded = false;
+
+  function renderSavingsBalance() {
+    const wrap = document.getElementById('savings-balance-card');
+    const savingsCat = CATEGORIES.expense.find(c => c.id === 'savings');
+    // За весь час, не за поточний період
+    const txs = state.transactions.filter(t => t.category === 'savings' && t.type === 'expense');
+
+    const totalsByCurrency = {};
+    txs.forEach(t => {
+      totalsByCurrency[t.currency] = (totalsByCurrency[t.currency] || 0) + Number(t.amount);
+    });
+    const totalParts = CURRENCIES.filter(c => totalsByCurrency[c]).map(c => SYMS[c] + fmt(totalsByCurrency[c]));
+
+    let detailsHtml = '';
+    if (savingsExpanded) {
+      // Розбивка по підкатегоріях
+      const subRows = (savingsCat.subcats || []).map(sc => {
+        const subTxs = txs.filter(t => t.subcategory === sc.id);
+        if (!subTxs.length) return '';
+        const bySub = {};
+        subTxs.forEach(t => { bySub[t.currency] = (bySub[t.currency] || 0) + Number(t.amount); });
+        const parts = CURRENCIES.filter(c => bySub[c]).map(c => SYMS[c] + fmt(bySub[c]));
+        return '<div style="padding:6px 0; border-top:0.5px solid rgba(255,255,255,0.2);">' +
+          '<div style="display:flex;justify-content:space-between;font-size:13px;">' +
+            '<span style="color:rgba(255,255,255,0.85);">' + sc.name + '</span>' +
+            '<span style="font-weight:600;">' + parts.join(' · ') + '</span>' +
+          '</div>' +
+          subTxs.slice(0, 5).map(t => {
+            const d = new Date(t.date + 'T00:00:00').toLocaleDateString('uk-UA', {day:'numeric', month:'short'});
+            return '<div style="display:flex;justify-content:space-between;font-size:11.5px;color:rgba(255,255,255,0.65);padding:2px 0 0 8px;">' +
+              '<span>' + d + (t.note ? ' · ' + escapeHtml(t.note) : '') + '</span>' +
+              '<span>' + fmtAmount(t.currency, t.amount) + '</span>' +
+            '</div>';
+          }).join('') +
+        '</div>';
+      }).filter(Boolean).join('');
+
+      const noSubTxs = txs.filter(t => !t.subcategory);
+      const noSubHtml = noSubTxs.length ? '<div style="padding:6px 0; border-top:0.5px solid rgba(255,255,255,0.2);">' +
+        '<div style="font-size:13px;color:rgba(255,255,255,0.65);">Без уточнення (' + noSubTxs.length + ')</div></div>' : '';
+
+      detailsHtml = '<div style="margin-top:8px;">' + (subRows || noSubHtml || '<p style="font-size:12.5px;color:rgba(255,255,255,0.6);margin:6px 0 0;">Немає записів.</p>') + '</div>';
+    }
+
+    wrap.innerHTML = '<div class="owed-card savings-card" id="savings-card-inner" style="cursor:pointer;">' +
+      '<div class="label" style="justify-content:space-between;">Заощадження (всього) <span>' + (savingsExpanded ? '▲' : '▼') + '</span></div>' +
+      '<div class="value">' + (totalParts.length ? totalParts.join(' · ') : '—') + '</div>' +
+      detailsHtml +
+    '</div>';
+
+    document.getElementById('savings-card-inner').addEventListener('click', () => {
+      savingsExpanded = !savingsExpanded;
+      renderSavingsBalance();
+    });
+  }
+
+  let owedDetailsExpanded = { toMe: false, byMe: false };
+
+  function renderOwedBalance() {
+    const wrap = document.getElementById('owed-balance-card');
+
+    // За весь час — без фільтру по periodLabel
+    const returnTxs = state.transactions.filter(t => t.category === 'returns' && t.type === 'income');
+    const owedToMeTotals = {};
+    returnTxs.forEach(t => {
+      owedToMeTotals[t.currency] = (owedToMeTotals[t.currency] || 0) + Number(t.amount);
+    });
+    const toMeParts = CURRENCIES.filter(c => owedToMeTotals[c]).map(c => SYMS[c] + fmt(owedToMeTotals[c]));
+
+    const debtTxs = state.transactions.filter(t =>
+      t.category === 'obligations' && t.subcategory === 'obligation_debt' && t.type === 'expense'
+    );
+    const owedByMeTotals = {};
+    debtTxs.forEach(t => {
+      owedByMeTotals[t.currency] = (owedByMeTotals[t.currency] || 0) + Number(t.amount);
+    });
+    const byMeParts = CURRENCIES.filter(c => owedByMeTotals[c]).map(c => SYMS[c] + fmt(owedByMeTotals[c]));
+
+    function txDetailRows(txs) {
+      if (!txs.length) return '<p style="font-size:12.5px;color:rgba(255,255,255,0.6);margin:6px 0 0;">Немає записів.</p>';
+      return txs.map(t => {
+        const d = new Date(t.date + 'T00:00:00').toLocaleDateString('uk-UA', {day:'numeric', month:'short'});
+        return '<div style="display:flex;justify-content:space-between;font-size:12.5px;padding:4px 0;border-top:0.5px solid rgba(255,255,255,0.15);">' +
+          '<span style="color:rgba(255,255,255,0.8);">' + d + (t.note ? ' · ' + escapeHtml(t.note) : '') + '</span>' +
+          '<span style="font-weight:600;">' + fmtAmount(t.currency, t.amount) + '</span>' +
+        '</div>';
+      }).join('');
+    }
+
+    const toMeDetails = owedDetailsExpanded.toMe ? txDetailRows(returnTxs) : '';
+    const byMeDetails = owedDetailsExpanded.byMe ? txDetailRows(debtTxs) : '';
+
+    wrap.innerHTML =
+      '<div class="owed-card owed-to-me" id="owed-to-me-card" style="cursor:pointer;">' +
+        '<div class="label" style="justify-content:space-between;">Очікувані повернення (всього) <span>' + (owedDetailsExpanded.toMe ? '▲' : '▼') + '</span></div>' +
+        '<div class="value">' + (toMeParts.length ? toMeParts.join(' · ') : '—') + '</div>' +
+        (owedDetailsExpanded.toMe ? '<div style="margin-top:4px;">' + toMeDetails + '</div>' : '') +
+      '</div>' +
+      '<div class="owed-card owed-by-me" id="owed-by-me-card" style="cursor:pointer;margin-top:8px;">' +
+        '<div class="label" style="justify-content:space-between;">Мої борги (всього) <span>' + (owedDetailsExpanded.byMe ? '▲' : '▼') + '</span></div>' +
+        '<div class="value">' + (byMeParts.length ? byMeParts.join(' · ') : '—') + '</div>' +
+        (owedDetailsExpanded.byMe ? '<div style="margin-top:4px;">' + byMeDetails + '</div>' : '') +
+      '</div>';
+
+    document.getElementById('owed-to-me-card').addEventListener('click', () => {
+      owedDetailsExpanded.toMe = !owedDetailsExpanded.toMe;
+      renderOwedBalance();
+    });
+    document.getElementById('owed-by-me-card').addEventListener('click', () => {
+      owedDetailsExpanded.byMe = !owedDetailsExpanded.byMe;
+      renderOwedBalance();
+    });
+  }
+
+  function bankHasBalance(bankId) {
+    return state.accounts.some(a => a.bankId === bankId);
+  }
+
+  function renderBankGroupSelector() {
+    const wrap = document.getElementById('bank-group-selector');
+    if (accountFlowStep !== null) { wrap.innerHTML = ''; return; }
+
+    const activeBanks = allBanks().filter(b => bankHasBalance(b.id));
+
+    let html = '';
+    if (activeBanks.length === 0) {
+      html += '<p class="empty-msg" style="padding:16px 0;">Немає доданих рахунків.</p>';
+    } else {
+      html += activeBanks.map(bank => {
+        const bankAccs = state.accounts.filter(a => a.bankId === bank.id);
+        const parts = bankAccs.filter(a => a.balance).map(a => (a.name !== 'Основний' ? a.name + ': ' : '') + fmtAmount(a.currency, a.balance));
+        return '<div class="bank-list-row">' +
+          '<div class="left-info"><span class="name">' + bank.name + '</span>' +
+          '<span class="vals">' + (parts.length ? parts.join(' · ') : '—') + '</span></div>' +
+          '<button class="edit-bank-btn" data-bank-edit="' + bank.id + '">Редагувати</button>' +
+        '</div>';
+      }).join('');
+    }
+    html += '<button class="add-account-btn" id="add-account-btn">' +
+      '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 5v14M5 12h14" stroke-linecap="round"/></svg>' +
+      'Додати рахунок' +
+    '</button>';
+
+    wrap.innerHTML = html;
+
+    wrap.querySelectorAll('[data-bank-edit]').forEach(btn => {
+      btn.addEventListener('click', () => {
+        const bankId = btn.dataset.bankEdit;
+        const groupIdx = BANK_GROUPS.findIndex(g => g.banks.some(b => b.id === bankId));
+        flowSelectedGroupIndex = groupIdx;
+        accountFlowStep = 'edit';
+        accountFlowEditBankId = bankId;
+        renderAccounts();
+      });
+    });
+
+    const addBtn = document.getElementById('add-account-btn');
+    if (addBtn) addBtn.addEventListener('click', () => {
+      accountFlowStep = 'country';
+      flowSelectedGroupIndex = null;
+      renderAccounts();
+    });
+  }
+
+  let accountFlowEditBankId = null;
+
+  function renderBankGroupDetail() {
+    const wrap = document.getElementById('bank-group-detail');
+
+    if (accountFlowStep === null || accountFlowStep === 'cash-edit' || accountFlowStep === 'crypto-edit') {
+      wrap.innerHTML = '';
+      return;
+    }
+
+    if (accountFlowStep === 'country') {
+      wrap.innerHTML = '<div class="country-pick-grid">' +
+        BANK_GROUPS.map((group, i) => {
+          return '<button class="country-pick" data-group="' + i + '">' + group.title + '</button>';
+        }).join('') +
+      '</div>' +
+      '<button class="group-back-btn" id="flow-cancel">Скасувати</button>';
+
+      wrap.querySelectorAll('[data-group]').forEach(btn => {
+        btn.addEventListener('click', () => {
+          flowSelectedGroupIndex = Number(btn.dataset.group);
+          accountFlowStep = 'bank';
+          renderBankGroupDetail();
+        });
+      });
+      document.getElementById('flow-cancel').addEventListener('click', () => {
+        accountFlowStep = null;
+        renderBankGroupSelector();
+        renderBankGroupDetail();
+      });
+      return;
+    }
+
+    if (accountFlowStep === 'bank') {
+      const group = BANK_GROUPS[flowSelectedGroupIndex];
+      wrap.innerHTML = '<div class="bank-pick-list">' +
+        group.banks.map(bank => {
+          return '<button class="bank-pick-row" data-bank="' + bank.id + '">' + bank.name + '</button>';
+        }).join('') +
+      '</div>' +
+      '<button class="group-back-btn" id="flow-back">' +
+        '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M15 18l-6-6 6-6" stroke-linecap="round" stroke-linejoin="round"/></svg>' +
+        'Назад до країн' +
+      '</button>';
+
+      wrap.querySelectorAll('[data-bank]').forEach(btn => {
+        btn.addEventListener('click', () => {
+          accountFlowEditBankId = btn.dataset.bank;
+          accountFlowStep = 'edit';
+          renderBankGroupDetail();
+        });
+      });
+      document.getElementById('flow-back').addEventListener('click', () => {
+        accountFlowStep = 'country';
+        renderBankGroupDetail();
+      });
+      return;
+    }
+
+    if (accountFlowStep === 'edit') {
+      const bank = allBanks().find(b => b.id === accountFlowEditBankId);
+      const bankAccounts = state.accounts.filter(a => a.bankId === bank.id);
+
+      const accountsHtml = bankAccounts.length
+        ? bankAccounts.map(acc => {
+            const typeLabel = ACCOUNT_TYPE_LABELS[acc.type] || acc.type;
+            return '<div class="bank-card" style="margin-bottom:8px;">' +
+              '<div class="bank-head">' +
+                '<div><span class="bank-name">' + acc.name + '</span>' +
+                '<span style="font-size:11.5px; color:var(--text-muted); margin-left:8px;">' + typeLabel + ' · ' + acc.currency + '</span></div>' +
+                '<span style="font-size:14px; font-variant-numeric:tabular-nums;">' + SYMS[acc.currency] + fmt(acc.balance) + '</span>' +
+              '</div>' +
+              '<div class="bank-balances" style="grid-template-columns:1fr 1fr; gap:6px; margin-top:8px;">' +
+                '<input type="text" inputmode="decimal" placeholder="Баланс" value="' + (acc.balance || '') + '" data-acc-id="' + acc.id + '" data-acc-balance>' +
+                '<button class="edit-bank-btn del-acc-btn" style="background:var(--danger-bg);color:var(--danger);border-color:var(--danger);" data-del-id="' + acc.id + '">Видалити</button>' +
+              '</div>' +
+            '</div>';
+          }).join('')
+        : '<p style="color:var(--text-muted);font-size:13px;margin:0 0 12px;">Ще немає рахунків для цього банку.</p>';
+
+      wrap.innerHTML = '<button class="group-back-btn" id="flow-done">' +
+        '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M15 18l-6-6 6-6" stroke-linecap="round" stroke-linejoin="round"/></svg>Готово</button>' +
+        '<p class="bank-group-title" style="margin-top:4px;">' + bank.name + '</p>' +
+        accountsHtml +
+        '<div class="bank-card" style="border-style:dashed;">' +
+          '<p style="font-size:13px;font-weight:600;margin:0 0 10px;">+ Новий рахунок</p>' +
+          '<div style="display:flex;flex-direction:column;gap:8px;">' +
+            '<input type="text" id="new-acc-name" placeholder="Назва (напр. Біла картка)">' +
+            '<div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;">' +
+              '<select id="new-acc-type">' +
+                Object.entries(ACCOUNT_TYPE_LABELS).map(([v,l]) => '<option value="' + v + '">' + l + '</option>').join('') +
+              '</select>' +
+              '<select id="new-acc-currency">' + CURRENCIES.map(c => '<option value="' + c + '">' + c + '</option>').join('') + '</select>' +
+            '</div>' +
+            '<input type="text" inputmode="decimal" id="new-acc-balance" placeholder="Початковий баланс (0)">' +
+            '<button class="save-btn" style="margin-top:4px;" id="new-acc-save">Додати рахунок</button>' +
+          '</div>' +
+        '</div>';
+
+      wrap.querySelectorAll('[data-acc-balance]').forEach(inp => {
+        inp.addEventListener('change', async () => {
+          const val = parseFloat(inp.value.replace(',', '.')) || 0;
+          await saveBalance(null, null, val, null, null, inp.dataset.accId);
+          renderAccountsTotal();
+          populateAccountSelect();
+        });
+      });
+
+      wrap.querySelectorAll('[data-del-id]').forEach(btn => {
+        btn.addEventListener('click', async () => {
+          await deleteAccount(btn.dataset.delId);
+          renderBankGroupDetail();
+          renderAccountsTotal();
+          populateAccountSelect();
+        });
+      });
+
+      document.getElementById('new-acc-save').addEventListener('click', async () => {
+        const name = document.getElementById('new-acc-name').value.trim() || 'Основний';
+        const type = document.getElementById('new-acc-type').value;
+        const currency = document.getElementById('new-acc-currency').value;
+        const balance = parseFloat(document.getElementById('new-acc-balance').value.replace(',', '.')) || 0;
+        await saveBalance(bank.id, currency, balance, name, type);
+        renderBankGroupDetail();
+        renderAccountsTotal();
+        populateAccountSelect();
+      });
+
+      document.getElementById('flow-done').addEventListener('click', () => {
+        accountFlowStep = null;
+        accountFlowEditBankId = null;
+        flowSelectedGroupIndex = null;
+        renderBankGroupSelector();
+        renderBankGroupDetail();
+      });
+      return;
+    }
+  }
+
+  function renderAccountsTotal() {
+    const card = document.getElementById('accounts-total-card');
+    const hasRates = rates.EUR && rates.USD;
+    const targetCur = state.accountsCurrency;
+
+    const currencySelector = '<select class="stats-currency-select" id="accounts-currency-select">' +
+      CURRENCIES.map(c => '<option value="' + c + '"' + (c === targetCur ? ' selected' : '') + '>' + c + '</option>').join('') +
+    '</select>';
+
+    if (!hasRates) {
+      card.innerHTML = '<div class="accounts-total-card"><div class="label">Загальний баланс ' + currencySelector + '</div>' +
+        '<div class="value" style="font-size:15px;">Курс недоступний — перевір інтернет</div></div>';
+      const sel0 = document.getElementById('accounts-currency-select');
+      if (sel0) sel0.addEventListener('change', () => { state.accountsCurrency = sel0.value; renderAccountsTotal(); });
+      return;
+    }
+
+    const sumsByCurrency = {EUR:0, UAH:0, USD:0, PLN:0};
+    const EXCLUDED_FROM_TOTAL = ['owed_to_me', 'owed_by_me'];
+    Object.entries(state.balances).forEach(([bankId, bankBalances]) => {
+      if (EXCLUDED_FROM_TOTAL.includes(bankId)) return;
+      CURRENCIES.forEach(cur => {
+        if (bankBalances[cur]) sumsByCurrency[cur] += bankBalances[cur];
+      });
+    });
+
+    const cryptoBal = state.balances['crypto'] || {};
+    let cryptoUah = 0;
+    CRYPTO.forEach(c => { if (cryptoBal[c]) cryptoUah += cryptoToUah(c, cryptoBal[c]); });
+    const cryptoInTarget = fromUahAmount(cryptoUah, targetCur) || 0;
+
+    let total = cryptoInTarget;
+    CURRENCIES.forEach(cur => {
+      const converted = convertAmount(sumsByCurrency[cur], cur, targetCur);
+      if (converted !== null) total += converted;
+    });
+
+    const breakdown = CURRENCIES.filter(c => sumsByCurrency[c] > 0)
+      .map(c => SYMS[c] + fmt(sumsByCurrency[c]))
+      .join(' &nbsp;·&nbsp; ');
+
+    // Готівка перша
+    const rowsHtml = [];
+    const cashAccs = state.accounts.filter(a => a.bankId === 'cash' && a.balance);
+    if (cashAccs.length) {
+      const cashParts = cashAccs.map(a => (a.name !== 'Основний' ? a.name + ': ' : '') + fmtAmount(a.currency, a.balance));
+      rowsHtml.push('<div class="bank-row"><span class="name">💵 Готівка</span><span class="vals">' + cashParts.join(' · ') + '</span></div>');
+    }
+
+    // Банки
+    allBanks().forEach(bank => {
+      const bankAccs = state.accounts.filter(a => a.bankId === bank.id && a.balance);
+      if (!bankAccs.length) return;
+      const parts = bankAccs.map(a => (a.name !== 'Основний' ? a.name + ': ' : '') + fmtAmount(a.currency, a.balance));
+      rowsHtml.push('<div class="bank-row"><span class="name">' + bank.name + '</span><span class="vals">' + parts.join(' · ') + '</span></div>');
+    });
+
+    // Крипто останнє — одним рядком через кому
+    const cryptoAccs = state.accounts.filter(a => a.bankId === 'crypto' && a.balance);
+    if (cryptoAccs.length) {
+      const cryptoParts = cryptoAccs.map(a => fmtAmount(a.currency, a.balance));
+      rowsHtml.push('<div class="bank-row"><span class="name">🪙 Крипто</span><span class="vals" style="text-align:right;">' + cryptoParts.join(', ') + '</span></div>');
+    }
+
+    card.innerHTML = '<div class="accounts-total-card">' +
+      '<div class="label">Загальний баланс ' + currencySelector + '</div>' +
+      '<div class="value">' + SYMS[targetCur] + fmt(total) + '</div>' +
+      (breakdown ? '<div class="breakdown">' + breakdown + '</div>' : '') +
+      (rowsHtml.length ? '<div class="bank-rows">' + rowsHtml.join('') + '</div>' : '') +
+    '</div>';
+
+    const selEl = document.getElementById('accounts-currency-select');
+    if (selEl) selEl.addEventListener('change', () => {
+      state.accountsCurrency = selEl.value;
+      renderAccountsTotal();
+    });
+  }
+
+  function escapeHtml(s) {
+    const d = document.createElement('div');
+    d.textContent = s;
+    return d.innerHTML;
+  }
+
+  function renderAll() { renderStats(); renderFilterChips(); renderList(); populateAccountSelect(); }
+
+  // ---- events ----
+  document.querySelectorAll('.tab').forEach(t => t.addEventListener('click', () => switchView(t.dataset.view)));
+  document.querySelectorAll('.period-btn').forEach(b => b.addEventListener('click', () => {
+    state.period = b.dataset.period;
+    document.querySelectorAll('.period-btn').forEach(x => x.classList.remove('active'));
+    b.classList.add('active');
+    renderStats();
+  }));
+  const ACCOUNT_TYPE_LABELS = {
+    debit: 'Дебітова · Особистий',
+    debit_fop: 'Дебітова · ФОП',
+    credit: 'Кредитна · Особистий',
+    credit_fop: 'Кредитна · ФОП',
+    cashback: 'Кешбек',
+    savings_jar: 'Копілка',
+    other: 'Інший'
+  };
+
+  function populateAccountSelect() {
+    const sel = document.getElementById('account-select');
+    let html = '';
+
+    const cashAccs = state.accounts.filter(a => a.bankId === 'cash');
+    const cryptoAccs = state.accounts.filter(a => a.bankId === 'crypto');
+    const bankAccs = state.accounts.filter(a => a.bankId !== 'cash' && a.bankId !== 'crypto');
+
+    // 1. Готівка — лише ті де є ненульовий баланс; якщо немає жодного рахунку — UAH як дефолт
+    const cashWithBalance = cashAccs.filter(a => a.balance);
+    if (cashWithBalance.length) {
+      cashWithBalance.forEach(a => {
+        const label = a.name !== 'Основний' ? a.name + ' (' + a.currency + ')' : '💵 Готівка (' + a.currency + ')';
+        html += '<option value="' + a.id + '">' + label + '</option>';
+      });
+    } else if (cashAccs.length) {
+      // Є рахунки але всі нульові — показуємо їх (щоб можна було записати витрату)
+      cashAccs.forEach(a => {
+        const label = a.name !== 'Основний' ? a.name + ' (' + a.currency + ')' : '💵 Готівка (' + a.currency + ')';
+        html += '<option value="' + a.id + '">' + label + '</option>';
+      });
+    } else {
+      // Немає жодного рахунку готівки — тільки UAH щоб не захаращувати
+      html += '<option value="__cash_UAH__">💵 Готівка (UAH)</option>';
+    }
+
+    // 2. Банківські рахунки — тільки з балансом, згруповані по банку
+    const byBank = {};
+    bankAccs.forEach(a => {
+      if (!byBank[a.bankId]) byBank[a.bankId] = [];
+      byBank[a.bankId].push(a);
+    });
+
+    BANK_GROUPS.forEach(group => {
+      group.banks.forEach(bank => {
+        const accs = (byBank[bank.id] || []).filter(a => a.balance);
+        if (accs.length) {
+          html += '<optgroup label="' + bank.name + '">';
+          accs.forEach(a => {
+            html += '<option value="' + a.id + '">' + a.name + ' (' + a.currency + ')</option>';
+          });
+          html += '</optgroup>';
+        }
+      });
+    });
+
+    if (!html) html = '<option value="">— Спершу додай рахунок на вкладці "Рахунки" —</option>';
+    sel.innerHTML = html;
+
+    // Встановлюємо поточне значення; якщо поточного немає — перший у списку
+    if (state.currentAccount && sel.querySelector('[value="' + state.currentAccount + '"]')) {
+      sel.value = state.currentAccount;
+    } else if (sel.options.length) {
+      state.currentAccount = sel.options[0].value;
+      sel.value = state.currentAccount;
+    }
+
+    // Синхронізуємо валюту суми з поточним рахунком
+    const curSel = document.getElementById('currency');
+    if (curSel && state.currentAccount) {
+      let accCurrency = null;
+      if (state.currentAccount.startsWith('__cash_') && state.currentAccount.endsWith('__')) {
+        accCurrency = state.currentAccount.replace('__cash_', '').replace('__', '');
+      } else {
+        const acc = state.accounts.find(a => a.id === state.currentAccount);
+        if (acc) accCurrency = acc.currency;
+      }
+      if (accCurrency && CURRENCIES.includes(accCurrency)) {
+        curSel.value = accCurrency;
+      }
+    }
+  }
+
+  document.getElementById('account-select').addEventListener('change', (e) => {
+    state.currentAccount = e.target.value;
+
+    // Синхронізуємо валюту суми з валютою обраного рахунку
+    let accCurrency = null;
+    if (e.target.value.startsWith('__cash_') && e.target.value.endsWith('__')) {
+      accCurrency = e.target.value.replace('__cash_', '').replace('__', '');
+    } else {
+      const acc = state.accounts.find(a => a.id === e.target.value);
+      if (acc) accCurrency = acc.currency;
+    }
+    if (accCurrency && CURRENCIES.includes(accCurrency)) {
+      document.getElementById('currency').value = accCurrency;
+    }
+  });
+
+  document.getElementById('type-expense').addEventListener('click', () => setType('expense'));
+  document.getElementById('type-income').addEventListener('click', () => setType('income'));
+  document.getElementById('date').value = new Date().toISOString().split('T')[0];
+
+  function sanitizeAmountInput(e) {
+    let v = e.target.value;
+    v = v.replace(/[^0-9.,]/g, '');
+    const parts = v.split(/[.,]/);
+    if (parts.length > 2) {
+      v = parts[0] + (v.includes(',') ? ',' : '.') + parts.slice(1).join('');
+    }
+    e.target.value = v;
+  }
+
+  document.getElementById('amount').addEventListener('input', sanitizeAmountInput);
+  document.getElementById('view-accounts').addEventListener('input', (e) => {
+    // Застосовуємо фільтр цифр лише до числових полів балансу, не до назв
+    if (e.target.tagName === 'INPUT' && e.target.type === 'text' && e.target.dataset.accBalance !== undefined) {
+      sanitizeAmountInput(e);
+    }
+  });
+
+  document.getElementById('save-btn').addEventListener('click', async () => {
+    const amount = parseFloat(document.getElementById('amount').value.replace(',', '.'));
+    const currency = document.getElementById('currency').value;
+    const catBtn = document.querySelector('#cat-grid .cat-pick.active');
+    const category = catBtn ? catBtn.dataset.cat : CATEGORIES[state.currentType][0].id;
+    const subcatBtn = document.querySelector('#subcat-grid .cat-pick.active');
+    const subcategory = subcatBtn ? subcatBtn.dataset.subcat : null;
+    const note = document.getElementById('note').value.trim();
+    const date = document.getElementById('date').value;
+    const msgEl = document.getElementById('save-msg');
+
+    if (!amount || amount <= 0) {
+      msgEl.textContent = 'Вкажи коректну суму.'; msgEl.className = 'save-msg err'; return;
+    }
+    if (!date) {
+      msgEl.textContent = 'Вкажи дату.'; msgEl.className = 'save-msg err'; return;
+    }
+
+    // Якщо вибрано дефолтний варіант готівки (ще немає іменованого рахунку) — створюємо його автоматично
+    let accountId = state.currentAccount;
+    if (accountId && accountId.startsWith('__cash_') && accountId.endsWith('__')) {
+      const cashCur = accountId.replace('__cash_', '').replace('__', '');
+      const newId = await saveBalance('cash', cashCur, 0, 'Основний', 'debit');
+      if (newId) {
+        accountId = newId;
+        state.currentAccount = accountId;
+        populateAccountSelect();
+      }
+    }
+
+    const ok = await insertTransaction({ type: state.currentType, amount, currency, account: accountId, category, subcategory, note, date });
+    if (ok) {
+      msgEl.textContent = 'Запис збережено.'; msgEl.className = 'save-msg ok';
+      document.getElementById('amount').value = '';
+      document.getElementById('note').value = '';
+      renderStats();
+    } else {
+      msgEl.textContent = 'Помилка збереження. Спробуй ще раз.'; msgEl.className = 'save-msg err';
+    }
+    setTimeout(() => { msgEl.textContent=''; msgEl.className='save-msg'; }, 2200);
+  });
+
+  // ---- auth ----
+  function showApp() {
+    document.getElementById('auth-screen').style.display = 'none';
+    document.getElementById('app').style.display = 'flex';
+    document.getElementById('user-email').textContent = currentUser.email;
+  }
+
+  // Завантажує всі дані після входу/реєстрації; якщо рахунки ще порожні —
+  // одразу переводить на вкладку "Рахунки", щоб людина одразу їх заповнила.
+  async function initAppDataAndRoute() {
+    loadRates().then(renderStats);
+    loadCryptoRates();
+    loadData();
+    await loadBalances();
+    populateAccountSelect(); // тепер state.accounts заповнений — покаже правильний рахунок
+    loadBudgetLimit().then(renderStats);
+
+    const hasAnyBalance = state.accounts.length > 0;
+    if (!hasAnyBalance) {
+      switchView('accounts');
+    } else {
+      switchView('stats');
+    }
+  }
+  function showAuth() {
+    document.getElementById('auth-screen').style.display = 'flex';
+    document.getElementById('app').style.display = 'none';
+  }
+
+  function setAuthMode(mode) {
+    authMode = mode;
+    const title = document.getElementById('auth-title');
+    const sub = document.getElementById('auth-sub');
+    const submitBtn = document.getElementById('auth-submit');
+    const switchText = document.getElementById('switch-text');
+    const switchBtn = document.getElementById('switch-btn');
+    const confirmWrap = document.getElementById('auth-confirm-wrap');
+    if (mode === 'login') {
+      title.textContent = 'Вхід';
+      sub.textContent = 'Увійди, щоб вести свій бюджет.';
+      submitBtn.textContent = 'Увійти';
+      switchText.textContent = 'Ще немає акаунту?';
+      switchBtn.textContent = 'Зареєструватись';
+      confirmWrap.style.display = 'none';
+      document.getElementById('auth-password').autocomplete = 'current-password';
+    } else {
+      title.textContent = 'Реєстрація';
+      sub.textContent = 'Створи акаунт, щоб почати вести бюджет.';
+      submitBtn.textContent = 'Зареєструватись';
+      switchText.textContent = 'Вже є акаунт?';
+      switchBtn.textContent = 'Увійти';
+      confirmWrap.style.display = 'block';
+      document.getElementById('auth-password').autocomplete = 'new-password';
+    }
+    document.getElementById('auth-msg').textContent = '';
+    document.getElementById('auth-password-confirm').value = '';
+  }
+
+  document.getElementById('switch-btn').addEventListener('click', () => {
+    setAuthMode(authMode === 'login' ? 'signup' : 'login');
+  });
+
+  document.getElementById('auth-submit').addEventListener('click', async () => {
+    const email = document.getElementById('auth-email').value.trim();
+    const password = document.getElementById('auth-password').value;
+    const msgEl = document.getElementById('auth-msg');
+
+    if (!email || !password) {
+      msgEl.textContent = 'Заповни email і пароль.'; msgEl.className = 'err'; return;
+    }
+    if (password.length < 6) {
+      msgEl.textContent = 'Пароль має містити щонайменше 6 символів.'; msgEl.className = 'err'; return;
+    }
+
+    // Перевірка підтвердження пароля при реєстрації
+    if (authMode === 'signup') {
+      const confirm = document.getElementById('auth-password-confirm').value;
+      if (!confirm) {
+        msgEl.textContent = 'Підтверди пароль у третьому полі.'; msgEl.className = 'err'; return;
+      }
+      if (password !== confirm) {
+        msgEl.textContent = 'Паролі не збігаються. Перевір і спробуй ще раз.'; msgEl.className = 'err'; return;
+      }
+    }
+
+    msgEl.textContent = 'Зачекай…'; msgEl.className = '';
+
+    if (authMode === 'login') {
+      const { data, error } = await sb.auth.signInWithPassword({ email, password });
+      if (error) {
+        msgEl.textContent = 'Невірний email або пароль.'; msgEl.className = 'err';
+        return;
+      }
+      currentUser = data.user;
+      showApp();
+      initAppDataAndRoute();
+    } else {
+      const { data, error } = await sb.auth.signUp({ email, password });
+      if (error) {
+        msgEl.textContent = error.message.includes('already registered') ? 'Цей email вже зареєстровано.' : 'Помилка реєстрації. Спробуй ще раз.';
+        msgEl.className = 'err';
+        return;
+      }
+      if (data.session) {
+        currentUser = data.user;
+        showApp();
+        initAppDataAndRoute();
+      } else {
+        msgEl.innerHTML = '📧 <strong>Лист надіслано на пошту!</strong><br>Відкрий <strong>' + email + '</strong>, знайди лист від Supabase і натисни «Confirm email address».<br><br>Після підтвердження повернись сюди і натисни <strong>«Увійти»</strong>.';
+        msgEl.className = 'info';
+        setAuthMode('login');
+      }
+    }
+  });
+
+  document.getElementById('logout-btn').addEventListener('click', async () => {
+    await sb.auth.signOut();
+    currentUser = null;
+    state.transactions = [];
+    state.balances = {};
+    showAuth();
+  });
+
+  async function initAuth() {
+    const { data } = await sb.auth.getSession();
+    if (data.session) {
+      currentUser = data.session.user;
+      showApp();
+      initAppDataAndRoute();
+    } else {
+      showAuth();
+    }
+  }
+
+  setType('expense');
+  populateAccountSelect();
+  initAuth();
+})();
+</script>
+</body>
+</html>
