@@ -1823,30 +1823,28 @@
   function renderOwedStatsCards() {
     const wrap = document.getElementById('owed-stats-cards');
 
-    const toMeDebts = state.debts.filter(d => d.direction === 'to_me' && !d.is_closed);
-    const byMeDebts = state.debts.filter(d => d.direction === 'by_me' && !d.is_closed);
-
+    // Рахуємо з транзакцій (як було раніше)
+    const returnTxs = state.transactions.filter(t => t.category === 'returns' && t.type === 'income');
+    const debtTxs = state.transactions.filter(t =>
+      t.category === 'obligations' && t.subcategory === 'obligation_debt' && t.type === 'expense'
+    );
     const toMeTotals = {}, byMeTotals = {};
-    toMeDebts.forEach(d => { toMeTotals[d.currency] = (toMeTotals[d.currency] || 0) + debtBalance(d); });
-    byMeDebts.forEach(d => { byMeTotals[d.currency] = (byMeTotals[d.currency] || 0) + debtBalance(d); });
+    returnTxs.forEach(t => { toMeTotals[t.currency] = (toMeTotals[t.currency] || 0) + Number(t.amount); });
+    debtTxs.forEach(t => { byMeTotals[t.currency] = (byMeTotals[t.currency] || 0) + Number(t.amount); });
 
-    const toMeParts = Object.entries(toMeTotals).filter(([,v]) => v > 0).map(([c,v]) => SYMS[c] + fmt(v));
-    const byMeParts = Object.entries(byMeTotals).filter(([,v]) => v > 0).map(([c,v]) => SYMS[c] + fmt(v));
+    const toMeParts = CURRENCIES.filter(c => toMeTotals[c]).map(c => SYMS[c] + fmt(toMeTotals[c]));
+    const byMeParts = CURRENCIES.filter(c => byMeTotals[c]).map(c => SYMS[c] + fmt(byMeTotals[c]));
 
-    if (!toMeParts.length && !byMeParts.length && !toMeDebts.length && !byMeDebts.length) {
-      wrap.innerHTML = ''; return;
-    }
+    if (!toMeParts.length && !byMeParts.length) { wrap.innerHTML = ''; return; }
 
     wrap.innerHTML = '<div class="owed-stats-grid">' +
       '<div class="owed-card owed-to-me">' +
-        '<div class="label">Винні мені (' + toMeDebts.length + ')</div>' +
+        '<div class="label">Винні мені (всього)</div>' +
         '<div class="value">' + (toMeParts.length ? toMeParts.join(' · ') : '—') + '</div>' +
-        (toMeDebts.length ? '<div style="font-size:11px;color:rgba(255,255,255,0.7);margin-top:6px;">' + toMeDebts.map(d => escapeHtml(d.person_name) + ': ' + SYMS[d.currency] + fmt(debtBalance(d))).join(' · ') + '</div>' : '') +
       '</div>' +
       '<div class="owed-card owed-by-me">' +
-        '<div class="label">Я винен (' + byMeDebts.length + ')</div>' +
+        '<div class="label">Я винен (всього)</div>' +
         '<div class="value">' + (byMeParts.length ? byMeParts.join(' · ') : '—') + '</div>' +
-        (byMeDebts.length ? '<div style="font-size:11px;color:rgba(255,255,255,0.7);margin-top:6px;">' + byMeDebts.map(d => escapeHtml(d.person_name) + ': ' + SYMS[d.currency] + fmt(debtBalance(d))).join(' · ') + '</div>' : '') +
       '</div>' +
     '</div>';
   }
@@ -2279,18 +2277,27 @@
     }
 
     function sectionHtml(direction, label, cls) {
+      // Основна сума — з транзакцій (як було раніше)
+      const txCat = direction === 'to_me' ? 'returns' : 'obligations';
+      const txType = direction === 'to_me' ? 'income' : 'expense';
+      const relevantTxs = state.transactions.filter(t =>
+        t.category === txCat && t.type === txType &&
+        (direction === 'to_me' || t.subcategory === 'obligation_debt')
+      );
+      const txTotals = {};
+      relevantTxs.forEach(t => { txTotals[t.currency] = (txTotals[t.currency] || 0) + Number(t.amount); });
+      const txParts = CURRENCIES.filter(c => txTotals[c]).map(c => SYMS[c] + fmt(txTotals[c]));
+
+      // Деталізація — конкретні борги з таблиці debts (якщо є)
       const debts = state.debts.filter(d => d.direction === direction && !d.is_closed);
       const closedDebts = state.debts.filter(d => d.direction === direction && d.is_closed);
-      const totalByCur = {};
-      debts.forEach(d => { totalByCur[d.currency] = (totalByCur[d.currency] || 0) + debtBalance(d); });
-      const parts = Object.entries(totalByCur).filter(([,v]) => v > 0).map(([c,v]) => SYMS[c] + fmt(v));
 
       return '<div class="owed-card ' + cls + '" style="margin-bottom:8px;">' +
-        '<div class="label">' + label + ' (' + debts.length + ')</div>' +
-        '<div class="value">' + (parts.length ? parts.join(' · ') : '—') + '</div>' +
+        '<div class="label">' + label + '</div>' +
+        '<div class="value">' + (txParts.length ? txParts.join(' · ') : '—') + '</div>' +
         debts.map(debtRow).join('') +
         (closedDebts.length ? '<div style="font-size:11.5px;color:rgba(255,255,255,0.5);margin-top:8px;">Закриті: ' + closedDebts.map(d => escapeHtml(d.person_name)).join(', ') + '</div>' : '') +
-        '<button class="edit-bank-btn" style="width:100%;text-align:center;margin-top:10px;color:rgba(255,255,255,0.9);background:rgba(255,255,255,0.15);border-color:rgba(255,255,255,0.3);" id="add-debt-' + direction + '">+ Новий борг</button>' +
+        '<button class="edit-bank-btn" style="width:100%;text-align:center;margin-top:10px;color:rgba(255,255,255,0.9);background:rgba(255,255,255,0.15);border-color:rgba(255,255,255,0.3);" id="add-debt-' + direction + '">+ Додати борг до трекера</button>' +
       '</div>';
     }
 
