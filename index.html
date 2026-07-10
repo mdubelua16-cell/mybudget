@@ -3111,20 +3111,24 @@
       });
     });
 
-    // Перераховуємо creditTotal з транзакцій
+    // Перераховуємо creditTotal з транзакцій (від'ємне = залишок)
     let creditTotal = 0;
     allBanks().forEach(bank => {
       state.accounts.filter(a => a.bankId === bank.id && CREDIT_TYPES.includes(a.type)).forEach(acc => {
-        const used = Math.max(0, calcCreditBalance(acc.id, acc.currency));
-        const converted = convertAmount(used, acc.currency, targetCur);
-        if (converted !== null) creditTotal += converted;
+        const used = calcCreditBalance(acc.id, acc.currency);
+        const converted = convertAmount(Math.abs(used), acc.currency, targetCur);
+        if (converted !== null) creditTotal += (used < 0 ? converted : -converted);
       });
     });
+    const creditSign = creditTotal >= 0 ? '+' : '';
 
     const hasCreditAccs = state.accounts.some(a => CREDIT_TYPES.includes(a.type));
     const creditSection = hasCreditAccs ? '<div style="margin-top:12px;padding-top:12px;border-top:0.5px solid rgba(255,255,255,0.2);">' +
       '<div style="font-size:11px;color:rgba(255,255,255,0.6);margin-bottom:4px;">КРЕДИТНІ КАРТКИ</div>' +
-      '<div style="font-size:20px;font-weight:700;color:rgba(255,255,255,0.9);">' + SYMS[targetCur] + fmt(creditTotal) + '</div>' +
+      '<div style="font-size:20px;font-weight:700;color:' + (creditTotal >= 0 ? 'rgba(100,255,150,0.95)' : 'rgba(255,255,255,0.9)') + ';">' +
+        creditSign + SYMS[targetCur] + fmt(Math.abs(creditTotal)) +
+        (creditTotal >= 0 ? ' залишок' : ' борг') +
+      '</div>' +
       '<div class="bank-rows">' + creditRowsHtml.join('') + '</div>' +
     '</div>' : '';
 
