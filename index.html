@@ -107,12 +107,34 @@
     font-weight: 600;
   }
 
+  .period-nav {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    margin-bottom: 18px;
+  }
   .period-label {
     text-align: center;
     color: var(--text-muted);
     font-size: 13px;
-    margin-bottom: 18px;
+    min-width: 140px;
   }
+  .period-nav-btn {
+    background: var(--surface);
+    border: 0.5px solid var(--border);
+    border-radius: 8px;
+    color: var(--text-secondary);
+    font-size: 18px;
+    width: 32px;
+    height: 32px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-family: inherit;
+    line-height: 1;
+  }
+  .period-nav-btn:disabled { opacity: 0.3; }
 
   /* Currency summary cards */
   .currency-grid {
@@ -950,7 +972,11 @@
         <button class="period-btn active" data-period="month">Місяць</button>
         <button class="period-btn" data-period="year">Рік</button>
       </div>
-      <p class="period-label" id="period-label"></p>
+      <div class="period-nav">
+        <button class="period-nav-btn" id="period-prev">‹</button>
+        <span class="period-label" id="period-label"></span>
+        <button class="period-nav-btn" id="period-next">›</button>
+      </div>
 
       <div class="total-uah-card" id="total-uah-card"></div>
       <div id="budget-limit-card"></div>
@@ -1188,7 +1214,7 @@
     return bankName(accId) || accId;
   }
 
-  let state = { transactions: [], balances: {}, accounts: [], debts: [], currentType: 'expense', currentAccount: null, period: 'month', statsCurrency: 'UAH', accountsCurrency: 'UAH', budgetLimit: null, budgetLimitCurrency: 'UAH' };
+  let state = { transactions: [], balances: {}, accounts: [], debts: [], currentType: 'expense', currentAccount: null, period: 'month', periodOffset: 0, statsCurrency: 'UAH', accountsCurrency: 'UAH', budgetLimit: null, budgetLimitCurrency: 'UAH' };
   let rates = { EUR: null, USD: null, fetchedAt: null };
   const RATES_KEY = 'fx_rates_cache';
   let cryptoRates = { BTC: null, ETH: null, USDT: null, SOL: null, XRP: null, TRUMP: null, fetchedAt: null };
@@ -1627,19 +1653,30 @@
     if (period === 'year') d.setFullYear(d.getFullYear()+1);
     return d;
   }
-  function periodLabel(period) {
+  function refDate() {
     const now = new Date();
-    if (period === 'day') return now.toLocaleDateString('uk-UA', {day:'numeric', month:'long', year:'numeric'});
+    const o = state.periodOffset || 0;
+    if (o === 0) return now;
+    const d = new Date(now);
+    if (state.period === 'day') d.setDate(d.getDate() + o);
+    if (state.period === 'week') d.setDate(d.getDate() + o * 7);
+    if (state.period === 'month') d.setMonth(d.getMonth() + o);
+    if (state.period === 'year') d.setFullYear(d.getFullYear() + o);
+    return d;
+  }
+
+  function periodLabel(period) {
+    const ref = refDate();
+    if (period === 'day') return ref.toLocaleDateString('uk-UA', {day:'numeric', month:'long', year:'numeric'});
     if (period === 'week') {
-      const s = startOfPeriod('week', now), e = new Date(endOfPeriod('week', now)); e.setDate(e.getDate()-1);
+      const s = startOfPeriod('week', ref), e = new Date(endOfPeriod('week', ref)); e.setDate(e.getDate()-1);
       return s.toLocaleDateString('uk-UA',{day:'numeric',month:'short'}) + ' — ' + e.toLocaleDateString('uk-UA',{day:'numeric',month:'short'});
     }
-    if (period === 'month') return now.toLocaleDateString('uk-UA', {month:'long', year:'numeric'});
-    if (period === 'year') return now.getFullYear().toString();
+    if (period === 'month') return ref.toLocaleDateString('uk-UA', {month:'long', year:'numeric'});
+    if (period === 'year') return ref.getFullYear().toString();
   }
   function txInPeriod(tx, period) {
-    const now = new Date();
-    const s = startOfPeriod(period, now), e = endOfPeriod(period, now);
+    const s = startOfPeriod(period, refDate()), e = endOfPeriod(period, refDate());
     const td = new Date(tx.date + 'T00:00:00');
     return td >= s && td < e;
   }
@@ -1832,14 +1869,26 @@
   function renderOwedStatsCards() {
     const wrap = document.getElementById('owed-stats-cards');
 
-    // Рахуємо з транзакцій (як було раніше)
-    const returnTxs = state.transactions.filter(t => t.category === 'returns' && t.type === 'income');
-    const debtTxs = state.transactions.filter(t =>
-      t.category === 'obligations' && t.subcategory === 'obligation_debt' && t.type === 'expense'
-    );
-    const toMeTotals = {}, byMeTotals = {};
-    returnTxs.forEach(t => { toMeTotals[t.currency] = (toMeTotals[t.currency] || 0) + Number(t.amount); });
-    debtTxs.forEach(t => { byMeTotals[t.currency] = (byMeTotals[t.currency] || 0) + Number(t.amount); });
+    function calcTotal(direction) {
+      const txCat = direction === 'to_me' ? 'returns' : 'obligations';
+      const txType = direction === 'to_me' ? 'income' : 'expense';
+      const totals = {};
+      // Не-трекерні транзакції
+      state.transactions.filter(t =>
+        t.category === txCat && t.type === txType &&
+        (direction === 'to_me' || t.subcategory === 'obligation_debt') &&
+        !t.debt_id
+      ).forEach(t => { totals[t.currency] = (totals[t.currency] || 0) + Number(t.amount); });
+      // Залишки активних боргів з трекера
+      state.debts.filter(d => d.direction === direction && !d.is_closed).forEach(d => {
+        const remaining = debtBalance(d);
+        if (remaining > 0) totals[d.currency] = (totals[d.currency] || 0) + remaining;
+      });
+      return totals;
+    }
+
+    const toMeTotals = calcTotal('to_me');
+    const byMeTotals = calcTotal('by_me');
 
     const toMeParts = CURRENCIES.filter(c => toMeTotals[c]).map(c => SYMS[c] + fmt(toMeTotals[c]));
     const byMeParts = CURRENCIES.filter(c => byMeTotals[c]).map(c => SYMS[c] + fmt(byMeTotals[c]));
@@ -1907,6 +1956,9 @@
     renderBudgetLimitCard();
     renderOwedStatsCards();
     document.getElementById('period-label').textContent = periodLabel(state.period);
+    // Кнопка "вперед" неактивна якщо вже на поточному
+    const nextBtn = document.getElementById('period-next');
+    if (nextBtn) nextBtn.disabled = (state.periodOffset || 0) >= 0;
 
     const grid = document.getElementById('currency-grid');
     grid.innerHTML = CURRENCIES.map(cur => {
@@ -2291,18 +2343,27 @@
     function sectionHtml(direction, label, cls) {
       const txCat = direction === 'to_me' ? 'returns' : 'obligations';
       const txType = direction === 'to_me' ? 'income' : 'expense';
+
+      // Транзакції БЕЗ прив'язки до трекера боргів — для загальної суми і окремих рядків
       const relevantTxs = state.transactions.filter(t =>
         t.category === txCat && t.type === txType &&
-        (direction === 'to_me' || t.subcategory === 'obligation_debt')
+        (direction === 'to_me' || t.subcategory === 'obligation_debt') &&
+        !t.debt_id  // виключаємо ті що прив'язані до трекера — вони вже в debtRow
       ).sort((a,b) => new Date(b.date) - new Date(a.date));
 
+      // Для загальної суми беремо НЕ-трекерні транзакції + залишки з трекера
       const txTotals = {};
       relevantTxs.forEach(t => { txTotals[t.currency] = (txTotals[t.currency] || 0) + Number(t.amount); });
-      const txParts = CURRENCIES.filter(c => txTotals[c]).map(c => SYMS[c] + fmt(txTotals[c]));
 
-      // Конкретні борги з трекера
+      // Додаємо залишки активних боргів з трекера
       const debts = state.debts.filter(d => d.direction === direction && !d.is_closed);
       const closedDebts = state.debts.filter(d => d.direction === direction && d.is_closed);
+      debts.forEach(d => {
+        const remaining = debtBalance(d);
+        if (remaining > 0) txTotals[d.currency] = (txTotals[d.currency] || 0) + remaining;
+      });
+
+      const txParts = CURRENCIES.filter(c => txTotals[c]).map(c => SYMS[c] + fmt(txTotals[c]));
 
       const txRows = relevantTxs.length ? relevantTxs.map(t => {
         const d = new Date(t.date + 'T00:00:00').toLocaleDateString('uk-UA', {day:'numeric', month:'short'});
@@ -2794,10 +2855,22 @@
   document.querySelectorAll('.tab').forEach(t => t.addEventListener('click', () => switchView(t.dataset.view)));
   document.querySelectorAll('.period-btn').forEach(b => b.addEventListener('click', () => {
     state.period = b.dataset.period;
+    state.periodOffset = 0; // скидаємо на поточний при зміні типу
     document.querySelectorAll('.period-btn').forEach(x => x.classList.remove('active'));
     b.classList.add('active');
     renderStats();
   }));
+
+  document.getElementById('period-prev').addEventListener('click', () => {
+    state.periodOffset = (state.periodOffset || 0) - 1;
+    renderStats();
+  });
+  document.getElementById('period-next').addEventListener('click', () => {
+    state.periodOffset = (state.periodOffset || 0) + 1;
+    renderStats();
+    // Ховаємо кнопку "вперед" якщо вже на поточному
+    document.getElementById('period-next').disabled = state.periodOffset >= 0;
+  });
   const ACCOUNT_TYPE_LABELS = {
     debit: 'Дебітова · Особистий',
     debit_fop: 'Дебітова · ФОП',
