@@ -1381,7 +1381,8 @@
         category: row.category,
         subcategory: row.subcategory || null,
         note: row.note || '',
-        date: row.date
+        date: row.date,
+        debt_id: row.debt_id || null
       }));
     } catch (e) {
       console.log('loadData error', e.message);
@@ -1686,7 +1687,8 @@
   // "Повернули борг" та "Борг" — це ще не здійснені рухи коштів.
   // Вони показуються окремо (зелена/червона картка) і не входять у фактичний баланс.
   function isPendingTx(tx) {
-    if (tx.category === 'returns') return true;
+    // Тільки "Зобовʼязання → Борг" вважається очікуваним (ще не сплаченим)
+    // "Очікувані повернення" — це вже ОТРИМАНИЙ дохід, рахується в статистиці
     if (tx.category === 'obligations' && tx.subcategory === 'obligation_debt') return true;
     return false;
   }
