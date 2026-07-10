@@ -2620,6 +2620,14 @@
 
   let creditPayForms = {}; // accId -> bool (чи відкрита форма погашення)
 
+  function calcCreditBalance(accId, currency) {
+    // Борг = сума витрат - сума погашень по цій картці
+    const txs = state.transactions.filter(t => t.account === accId && t.currency === currency);
+    const spent = txs.filter(t => t.type === 'expense').reduce((s,t) => s + Number(t.amount), 0);
+    const paid = txs.filter(t => t.type === 'income').reduce((s,t) => s + Number(t.amount), 0);
+    return Math.max(0, spent - paid);
+  }
+
   function renderCreditTracker() {
     const wrap = document.getElementById('credit-tracker-card');
     const titleEl = document.getElementById('credit-tracker-title');
@@ -2639,7 +2647,8 @@
     wrap.innerHTML = creditAccs.map(acc => {
       const bankLabel = bankName(acc.bankId) || acc.bankId;
       const limit = acc.creditLimit;
-      const used = acc.balance;
+      // Рахуємо борг з транзакцій — не залежить від поля balance в базі
+      const used = calcCreditBalance(acc.id, acc.currency);
 
       // Всі транзакції з цієї кредитної картки (і витрати і погашення)
       const accTxs = state.transactions
@@ -3008,19 +3017,9 @@
       if (converted !== null) total += converted;
     });
 
-    let creditTotal = 0;
-    CURRENCIES.forEach(cur => {
-      const converted = convertAmount(creditSumsByCurrency[cur], cur, targetCur);
-      if (converted !== null) creditTotal += converted;
-    });
-
     const breakdown = CURRENCIES.filter(c => sumsByCurrency[c] > 0)
       .map(c => '<span>' + SYMS[c] + fmt(sumsByCurrency[c]) + '</span>')
       .join('');
-
-    const creditBreakdown = CURRENCIES.filter(c => creditSumsByCurrency[c] > 0)
-      .map(c => SYMS[c] + fmt(creditSumsByCurrency[c]))
-      .join(' &nbsp;·&nbsp; ');
 
     // Готівка перша
     const rowsHtml = [];
@@ -3052,16 +3051,15 @@
       rowsHtml.push('<div class="bank-row"><span class="name">🪙 Крипто</span><span class="vals" style="text-align:right;">' + cryptoParts.join(', ') + '</span></div>');
     }
 
-    // Кредитні картки окремо
     const creditRowsHtml = [];
     allBanks().forEach(bank => {
       const creditAccs = state.accounts.filter(a => a.bankId === bank.id && CREDIT_TYPES.includes(a.type));
       if (!creditAccs.length) return;
       creditAccs.forEach(acc => {
         const accName = acc.name !== 'Основний' ? acc.name : bank.name;
-        const used = acc.balance;
+        const used = calcCreditBalance(acc.id, acc.currency);
         const limit = acc.creditLimit;
-        const available = limit !== null ? limit - used : null;
+        const available = limit !== null ? Math.max(0, limit - used) : null;
         const pct = limit ? Math.min(100, Math.round((used / limit) * 100)) : 0;
         let row = '<div style="margin-bottom:8px;">' +
           '<div class="bank-row" style="margin-bottom:4px;">' +
@@ -3081,6 +3079,24 @@
         creditRowsHtml.push(row);
       });
     });
+
+    // Перераховуємо creditTotal з транзакцій
+    let creditTotal = 0;
+    allBanks().forEach(bank => {
+      state.accounts.filter(a => a.bankId === bank.id && CREDIT_TYPES.includes(a.type)).forEach(acc => {
+        const used = calcCreditBalance(acc.id, acc.currency);
+        const converted = convertAmount(used, acc.currency, targetCur);
+        if (converted !== null) creditTotal += converted;
+      });
+    });
+    const creditBreakdownMap = {};
+    allBanks().forEach(bank => {
+      state.accounts.filter(a => a.bankId === bank.id && CREDIT_TYPES.includes(a.type)).forEach(acc => {
+        const used = calcCreditBalance(acc.id, acc.currency);
+        if (used > 0) creditBreakdownMap[acc.currency] = (creditBreakdownMap[acc.currency] || 0) + used;
+      });
+    });
+    const creditBreakdown = Object.entries(creditBreakdownMap).map(([c,v]) => SYMS[c] + fmt(v)).join(' · ');
 
     const creditSection = creditBreakdown ? '<div style="margin-top:12px;padding-top:12px;border-top:0.5px solid rgba(255,255,255,0.2);">' +
       '<div style="font-size:11px;color:rgba(255,255,255,0.6);margin-bottom:4px;">КРЕДИТНІ КАРТКИ</div>' +
