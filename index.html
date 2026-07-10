@@ -1018,6 +1018,9 @@
 
       <p class="bank-group-title">Повернення боргів та мої борги</p>
       <div id="owed-balance-card"></div>
+
+      <p class="bank-group-title" id="credit-tracker-title" style="display:none;">Кредитні картки — трекер</p>
+      <div id="credit-tracker-card"></div>
     </div>
 
     <!-- ADD VIEW -->
@@ -2191,6 +2194,7 @@
     renderBankGroupDetail();
     renderSavingsBalance();
     renderOwedBalance();
+    renderCreditTracker();
     renderAccountsTotal();
   }
 
@@ -2608,6 +2612,121 @@
       renderAll();
       return true;
     } catch (e) { console.log('insertTransactionWithDebt error', e.message); return false; }
+  }
+
+  let creditPayForms = {}; // accId -> bool (чи відкрита форма погашення)
+
+  function renderCreditTracker() {
+    const wrap = document.getElementById('credit-tracker-card');
+    const titleEl = document.getElementById('credit-tracker-title');
+    const CREDIT_TYPES = ['credit', 'credit_fop'];
+    const creditAccs = state.accounts.filter(a => CREDIT_TYPES.includes(a.type));
+
+    if (!creditAccs.length) {
+      titleEl.style.display = 'none';
+      wrap.innerHTML = '';
+      return;
+    }
+    titleEl.style.display = 'block';
+
+    const cardStyle = 'border-radius:var(--radius);padding:16px 18px;margin-bottom:8px;color:#fff;background:linear-gradient(135deg,#8a3a6f 0%,#c2553c 100%);';
+    const inputStyle = 'width:100%;background:rgba(255,255,255,0.18);border:1px solid rgba(255,255,255,0.4);border-radius:8px;padding:10px 12px;color:#fff;font-size:15px;font-family:inherit;box-sizing:border-box;-webkit-user-select:text;user-select:text;margin-bottom:8px;';
+
+    wrap.innerHTML = creditAccs.map(acc => {
+      const bankLabel = bankName(acc.bankId) || acc.bankId;
+      const limit = acc.creditLimit;
+      const used = acc.balance;
+      const available = limit !== null ? limit - used : null;
+      const pct = limit ? Math.min(100, Math.round((used / limit) * 100)) : 0;
+
+      // Транзакції з цієї кредитної картки
+      const accTxs = state.transactions
+        .filter(t => t.account === acc.id && t.type === 'expense')
+        .sort((a,b) => new Date(b.date) - new Date(a.date))
+        .slice(0, 5);
+
+      const txRows = accTxs.map(t => {
+        const d = new Date(t.date + 'T00:00:00').toLocaleDateString('uk-UA', {day:'numeric', month:'short'});
+        const cat = CATEGORIES.expense.find(c => c.id === t.category);
+        return '<div style="display:flex;justify-content:space-between;font-size:12px;color:rgba(255,255,255,0.75);padding:4px 0;border-top:0.5px solid rgba(255,255,255,0.15);">' +
+          '<span>' + (cat ? cat.em + ' ' : '') + d + (t.note ? ' · ' + escapeHtml(t.note) : '') + '</span>' +
+          '<span>-' + fmtAmount(acc.currency, t.amount) + '</span>' +
+        '</div>';
+      }).join('');
+
+      const payForm = creditPayForms[acc.id] ? (
+        '<div style="margin-top:10px;">' +
+          '<input type="text" inputmode="decimal" placeholder="Сума погашення" style="' + inputStyle + '" id="cpay-amount-' + acc.id + '">' +
+          '<input type="text" placeholder="Коментар (опційно)" style="' + inputStyle + '" id="cpay-note-' + acc.id + '">' +
+          '<input type="date" style="' + inputStyle + '" id="cpay-date-' + acc.id + '" value="' + new Date().toISOString().split('T')[0] + '">' +
+          '<div style="display:flex;gap:8px;">' +
+            '<button class="save-btn" style="flex:1;" id="cpay-save-' + acc.id + '">Зберегти</button>' +
+            '<button class="edit-bank-btn" style="color:rgba(255,255,255,0.7);background:rgba(255,255,255,0.1);border-color:rgba(255,255,255,0.3);" id="cpay-cancel-' + acc.id + '">Скасувати</button>' +
+          '</div>' +
+        '</div>'
+      ) : '';
+
+      return '<div style="' + cardStyle + '" data-credit-acc="' + acc.id + '">' +
+        '<div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:8px;">' +
+          '<div><div style="font-size:14px;font-weight:600;">' + bankLabel + ' · ' + acc.name + '</div>' +
+          '<div style="font-size:11.5px;color:rgba(255,255,255,0.65);">' + acc.currency + (acc.type === 'credit_fop' ? ' · ФОП' : '') + '</div></div>' +
+          '<div style="text-align:right;">' +
+            '<div style="font-size:15px;font-weight:700;">' + fmtAmount(acc.currency, used) + ' використано</div>' +
+            (limit ? '<div style="font-size:11px;color:rgba(255,255,255,0.65);">з ' + fmtAmount(acc.currency, limit) + ' ліміту</div>' : '') +
+          '</div>' +
+        '</div>' +
+        (limit ? (
+          '<div style="height:4px;background:rgba(255,255,255,0.15);border-radius:2px;margin-bottom:6px;">' +
+            '<div style="height:100%;width:' + pct + '%;background:' + (pct > 80 ? '#ff8080' : 'rgba(255,255,255,0.7)') + ';border-radius:2px;"></div>' +
+          '</div>' +
+          '<div style="display:flex;justify-content:space-between;font-size:11.5px;color:rgba(255,255,255,0.7);margin-bottom:10px;">' +
+            '<span>Використано ' + pct + '%</span>' +
+            '<span>Доступно: ' + fmtAmount(acc.currency, available) + '</span>' +
+          '</div>'
+        ) : '') +
+        (txRows ? '<div style="margin-bottom:8px;">' + txRows + '</div>' : '') +
+        (!creditPayForms[acc.id] ?
+          '<button class="edit-bank-btn" style="width:100%;text-align:center;color:rgba(255,255,255,0.9);background:rgba(255,255,255,0.15);border-color:rgba(255,255,255,0.3);" id="cpay-open-' + acc.id + '">+ Погасити кредит</button>'
+          : payForm) +
+      '</div>';
+    }).join('');
+
+    // Обробники
+    creditAccs.forEach(acc => {
+      const openBtn = document.getElementById('cpay-open-' + acc.id);
+      if (openBtn) openBtn.addEventListener('click', () => {
+        creditPayForms[acc.id] = true;
+        renderCreditTracker();
+      });
+      const cancelBtn = document.getElementById('cpay-cancel-' + acc.id);
+      if (cancelBtn) cancelBtn.addEventListener('click', () => {
+        creditPayForms[acc.id] = false;
+        renderCreditTracker();
+      });
+      const saveBtn = document.getElementById('cpay-save-' + acc.id);
+      if (saveBtn) saveBtn.addEventListener('click', async () => {
+        const amount = parseFloat(document.getElementById('cpay-amount-' + acc.id).value.replace(',', '.'));
+        const note = document.getElementById('cpay-note-' + acc.id).value.trim();
+        const date = document.getElementById('cpay-date-' + acc.id).value;
+        if (!amount || amount <= 0) return;
+        saveBtn.textContent = 'Збереження…';
+        saveBtn.disabled = true;
+        // Погашення = зменшення балансу кредитної картки (дохід на картку)
+        const ok = await insertTransactionWithDebt({
+          type: 'income', amount, currency: acc.currency,
+          account: acc.id, category: 'other', subcategory: null,
+          note: note || 'Погашення кредиту', date
+        });
+        if (ok) {
+          creditPayForms[acc.id] = false;
+          renderCreditTracker();
+          renderAccountsTotal();
+        } else {
+          saveBtn.textContent = 'Зберегти';
+          saveBtn.disabled = false;
+        }
+      });
+    });
   }
 
   function bankHasBalance(bankId) {
