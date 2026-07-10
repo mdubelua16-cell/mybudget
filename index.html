@@ -2780,11 +2780,30 @@
     } else {
       html += activeBanks.map(bank => {
         const bankAccs = state.accounts.filter(a => a.bankId === bank.id);
-        const parts = bankAccs.filter(a => a.balance).map(a => (a.name !== 'Основний' ? a.name + ': ' : '') + fmtAmount(a.currency, a.balance));
-        return '<div class="bank-list-row">' +
-          '<div class="left-info"><span class="name">' + bank.name + '</span>' +
-          '<span class="vals">' + (parts.length ? parts.join(' · ') : '—') + '</span></div>' +
-          '<button class="edit-bank-btn" data-bank-edit="' + bank.id + '">Редагувати</button>' +
+        const nonCreditAccs = bankAccs.filter(a => a.balance && !CREDIT_TYPES.includes(a.type));
+        const creditAccs = bankAccs.filter(a => CREDIT_TYPES.includes(a.type));
+
+        let subRows = '';
+        nonCreditAccs.forEach(a => {
+          const label = a.name !== 'Основний' ? a.name : '';
+          subRows += '<div style="font-size:12px;color:var(--text-secondary);display:flex;justify-content:space-between;">' +
+            '<span>' + (label || 'Основний') + '</span><span>' + fmtAmount(a.currency, a.balance) + '</span></div>';
+        });
+        creditAccs.forEach(a => {
+          const used = calcCreditBalance(a.id, a.currency);
+          const hasRemainder = used < 0;
+          const label = a.name !== 'Основний' ? a.name : 'Кредитна';
+          subRows += '<div style="font-size:12px;color:var(--text-secondary);display:flex;justify-content:space-between;">' +
+            '<span>' + label + '</span><span style="color:' + (hasRemainder ? 'var(--success)' : 'var(--danger)') + ';">' +
+            (hasRemainder ? '+' : '') + fmtAmount(a.currency, Math.abs(used)) + '</span></div>';
+        });
+
+        return '<div class="bank-list-row" style="flex-direction:column;align-items:stretch;">' +
+          '<div style="display:flex;justify-content:space-between;align-items:center;">' +
+            '<span class="name">' + bank.name + '</span>' +
+            '<button class="edit-bank-btn" data-bank-edit="' + bank.id + '">Редагувати</button>' +
+          '</div>' +
+          (subRows ? '<div style="margin-top:4px;">' + subRows + '</div>' : '') +
         '</div>';
       }).join('');
     }
@@ -3062,22 +3081,28 @@
       if (!creditAccs.length) return;
       creditAccs.forEach(acc => {
         const accName = acc.name !== 'Основний' ? acc.name : bank.name;
-        const used = calcCreditBalance(acc.id, acc.currency);
+        const rawUsed = calcCreditBalance(acc.id, acc.currency);
+        const hasRemainder = rawUsed < 0;
+        const displayUsed = Math.abs(rawUsed);
         const limit = acc.creditLimit;
-        const available = limit !== null ? Math.max(0, limit - used) : null;
-        const pct = limit ? Math.min(100, Math.round((used / limit) * 100)) : 0;
+        const pct = limit ? Math.min(100, Math.max(0, Math.round((rawUsed / limit) * 100))) : 0;
+        const available = limit !== null ? limit - rawUsed : null;
+
         let row = '<div style="margin-bottom:8px;">' +
           '<div class="bank-row" style="margin-bottom:4px;">' +
             '<span class="name">' + accName + '</span>' +
-            '<span class="vals">' + fmtAmount(acc.currency, used) + (limit ? ' / ' + fmtAmount(acc.currency, limit) : '') + '</span>' +
+            '<span class="vals" style="color:' + (hasRemainder ? 'rgba(100,255,150,0.9)' : 'rgba(255,255,255,0.9)') + ';">' +
+              (hasRemainder ? '+' : '') + fmtAmount(acc.currency, displayUsed) +
+              (limit ? ' / ' + fmtAmount(acc.currency, limit) : '') +
+            '</span>' +
           '</div>';
         if (limit) {
           row += '<div style="font-size:11px;color:rgba(255,255,255,0.6);display:flex;justify-content:space-between;margin-bottom:3px;">' +
-            '<span>Використано ' + pct + '%</span>' +
+            '<span>' + (hasRemainder ? '✓ Залишок' : 'Борг ' + pct + '%') + '</span>' +
             '<span>Доступно: ' + fmtAmount(acc.currency, available) + '</span>' +
           '</div>' +
           '<div style="height:3px;background:rgba(255,255,255,0.15);border-radius:2px;">' +
-            '<div style="height:100%;width:' + pct + '%;background:' + (pct > 80 ? '#ff6b6b' : 'rgba(255,255,255,0.6)') + ';border-radius:2px;"></div>' +
+            '<div style="height:100%;width:' + pct + '%;background:' + (hasRemainder ? 'rgba(100,255,150,0.7)' : pct > 80 ? '#ff6b6b' : 'rgba(255,255,255,0.6)') + ';border-radius:2px;"></div>' +
           '</div>';
         }
         row += '</div>';
@@ -3089,24 +3114,16 @@
     let creditTotal = 0;
     allBanks().forEach(bank => {
       state.accounts.filter(a => a.bankId === bank.id && CREDIT_TYPES.includes(a.type)).forEach(acc => {
-        const used = calcCreditBalance(acc.id, acc.currency);
+        const used = Math.max(0, calcCreditBalance(acc.id, acc.currency));
         const converted = convertAmount(used, acc.currency, targetCur);
         if (converted !== null) creditTotal += converted;
       });
     });
-    const creditBreakdownMap = {};
-    allBanks().forEach(bank => {
-      state.accounts.filter(a => a.bankId === bank.id && CREDIT_TYPES.includes(a.type)).forEach(acc => {
-        const used = calcCreditBalance(acc.id, acc.currency);
-        if (used > 0) creditBreakdownMap[acc.currency] = (creditBreakdownMap[acc.currency] || 0) + used;
-      });
-    });
-    const creditBreakdown = Object.entries(creditBreakdownMap).map(([c,v]) => SYMS[c] + fmt(v)).join(' · ');
 
-    const creditSection = creditBreakdown ? '<div style="margin-top:12px;padding-top:12px;border-top:0.5px solid rgba(255,255,255,0.2);">' +
+    const hasCreditAccs = state.accounts.some(a => CREDIT_TYPES.includes(a.type));
+    const creditSection = hasCreditAccs ? '<div style="margin-top:12px;padding-top:12px;border-top:0.5px solid rgba(255,255,255,0.2);">' +
       '<div style="font-size:11px;color:rgba(255,255,255,0.6);margin-bottom:4px;">КРЕДИТНІ КАРТКИ</div>' +
       '<div style="font-size:20px;font-weight:700;color:rgba(255,255,255,0.9);">' + SYMS[targetCur] + fmt(creditTotal) + '</div>' +
-      '<div style="font-size:12px;color:rgba(255,255,255,0.6);margin-bottom:6px;">' + creditBreakdown + '</div>' +
       '<div class="bank-rows">' + creditRowsHtml.join('') + '</div>' +
     '</div>' : '';
 
