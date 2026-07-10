@@ -1076,6 +1076,8 @@
       {id:'clothes', name:'Одяг', em:'👕'},
       {id:'health', name:'Здоров\'я', em:'💊'},
       {id:'rest', name:'Відпочинок', em:'🏖️'},
+      {id:'travel', name:'Туризм/подорожі', em:'✈️'},
+      {id:'restaurant', name:'Ресторани/кафе', em:'🍷'},
       {id:'subscriptions', name:'Підписки', em:'🔁'},
       {id:'education', name:'Освіта', em:'📚'},
       {id:'documents', name:'Документи/візи', em:'📄'},
@@ -2254,19 +2256,22 @@
         '</div>';
       }
 
-      return '<div style="background:rgba(255,255,255,0.08);border-radius:10px;padding:12px;margin-top:8px;" data-debt-row="' + debt.id + '">' +
+      const closedStyle = closed ? 'background:rgba(31,122,82,0.25);border:1px solid rgba(31,122,82,0.5);' : '';
+      return '<div style="' + closedStyle + 'border-radius:10px;padding:12px;margin-top:8px;background:' + (closed ? 'rgba(31,122,82,0.2)' : 'rgba(255,255,255,0.08)') + ';" data-debt-row="' + debt.id + '">' +
         '<div style="display:flex;justify-content:space-between;align-items:flex-start;">' +
           '<div style="flex:1;">' +
-            '<div style="font-size:14px;font-weight:600;">' + escapeHtml(debt.person_name) + '</div>' +
+            '<div style="font-size:14px;font-weight:600;">' + escapeHtml(debt.person_name) + (closed ? ' ✓' : '') + '</div>' +
             (debt.description ? '<div style="font-size:11.5px;color:rgba(255,255,255,0.65);">' + escapeHtml(debt.description) + '</div>' : '') +
           '</div>' +
           '<div style="text-align:right;margin-left:8px;">' +
-            '<div style="font-size:13px;font-weight:700;">' + SYMS[debt.currency] + fmt(remaining) + ' залишок</div>' +
+            '<div style="font-size:13px;font-weight:700;color:' + (closed ? 'rgba(100,255,150,0.9)' : 'rgba(255,255,255,1)') + ';">' +
+              (closed ? '✓ Закрито' : SYMS[debt.currency] + fmt(remaining) + ' залишок') +
+            '</div>' +
             '<div style="font-size:11px;color:rgba(255,255,255,0.6);">з ' + SYMS[debt.currency] + fmt(debt.original_amount) + '</div>' +
           '</div>' +
         '</div>' +
         '<div style="height:4px;background:rgba(255,255,255,0.15);border-radius:2px;margin:8px 0 4px;">' +
-          '<div style="height:100%;width:' + pct + '%;background:rgba(255,255,255,0.7);border-radius:2px;"></div>' +
+          '<div style="height:100%;width:' + pct + '%;background:' + (closed ? 'rgba(100,255,150,0.8)' : 'rgba(255,255,255,0.7)') + ';border-radius:2px;transition:width 0.5s;"></div>' +
         '</div>' +
         (txs.length ? txs.map(t => {
           const d = new Date(t.date + 'T00:00:00').toLocaleDateString('uk-UA', {day:'numeric', month:'short'});
@@ -2424,9 +2429,10 @@
             category, subcategory, note, date, debt_id: debtId
           });
           if (ok) {
-            // Перевіряємо чи борг повністю закритий
-            const remaining = debtBalance(debt);
-            if (remaining <= 0) {
+            // Перечитуємо борги щоб мати актуальний стан
+            await loadDebts();
+            const updatedDebt = state.debts.find(d => d.id === debtId);
+            if (updatedDebt && debtBalance(updatedDebt) <= 0) {
               await saveDebt({ is_closed: true }, debtId);
             }
             renderOwedBalance();
@@ -2681,12 +2687,20 @@
     }
 
     const sumsByCurrency = {EUR:0, UAH:0, USD:0, PLN:0};
+    const creditSumsByCurrency = {EUR:0, UAH:0, USD:0, PLN:0};
     const EXCLUDED_FROM_TOTAL = ['owed_to_me', 'owed_by_me'];
-    Object.entries(state.balances).forEach(([bankId, bankBalances]) => {
-      if (EXCLUDED_FROM_TOTAL.includes(bankId)) return;
-      CURRENCIES.forEach(cur => {
-        if (bankBalances[cur]) sumsByCurrency[cur] += bankBalances[cur];
-      });
+    const CREDIT_TYPES = ['credit', 'credit_fop'];
+
+    // Рахуємо окремо: власні і кредитні
+    state.accounts.forEach(acc => {
+      if (acc.bankId === 'crypto') return;
+      if (EXCLUDED_FROM_TOTAL.includes(acc.bankId)) return;
+      if (!CURRENCIES.includes(acc.currency)) return;
+      if (CREDIT_TYPES.includes(acc.type)) {
+        creditSumsByCurrency[acc.currency] = (creditSumsByCurrency[acc.currency] || 0) + acc.balance;
+      } else {
+        sumsByCurrency[acc.currency] = (sumsByCurrency[acc.currency] || 0) + acc.balance;
+      }
     });
 
     const cryptoBal = state.balances['crypto'] || {};
@@ -2700,38 +2714,65 @@
       if (converted !== null) total += converted;
     });
 
+    let creditTotal = 0;
+    CURRENCIES.forEach(cur => {
+      const converted = convertAmount(creditSumsByCurrency[cur], cur, targetCur);
+      if (converted !== null) creditTotal += converted;
+    });
+
     const breakdown = CURRENCIES.filter(c => sumsByCurrency[c] > 0)
       .map(c => SYMS[c] + fmt(sumsByCurrency[c]))
       .join(' &nbsp;·&nbsp; ');
 
+    const creditBreakdown = CURRENCIES.filter(c => creditSumsByCurrency[c] > 0)
+      .map(c => SYMS[c] + fmt(creditSumsByCurrency[c]))
+      .join(' &nbsp;·&nbsp; ');
+
     // Готівка перша
     const rowsHtml = [];
-    const cashAccs = state.accounts.filter(a => a.bankId === 'cash' && a.balance);
+    const cashAccs = state.accounts.filter(a => a.bankId === 'cash' && a.balance && !CREDIT_TYPES.includes(a.type));
     if (cashAccs.length) {
       const cashParts = cashAccs.map(a => (a.name !== 'Основний' ? a.name + ': ' : '') + fmtAmount(a.currency, a.balance));
       rowsHtml.push('<div class="bank-row"><span class="name">💵 Готівка</span><span class="vals">' + cashParts.join(' · ') + '</span></div>');
     }
 
-    // Банки
+    // Банки (тільки не кредитні)
     allBanks().forEach(bank => {
-      const bankAccs = state.accounts.filter(a => a.bankId === bank.id && a.balance);
+      const bankAccs = state.accounts.filter(a => a.bankId === bank.id && a.balance && !CREDIT_TYPES.includes(a.type));
       if (!bankAccs.length) return;
       const parts = bankAccs.map(a => (a.name !== 'Основний' ? a.name + ': ' : '') + fmtAmount(a.currency, a.balance));
       rowsHtml.push('<div class="bank-row"><span class="name">' + bank.name + '</span><span class="vals">' + parts.join(' · ') + '</span></div>');
     });
 
-    // Крипто останнє — одним рядком через кому
+    // Крипто останнє
     const cryptoAccs = state.accounts.filter(a => a.bankId === 'crypto' && a.balance);
     if (cryptoAccs.length) {
       const cryptoParts = cryptoAccs.map(a => fmtAmount(a.currency, a.balance));
       rowsHtml.push('<div class="bank-row"><span class="name">🪙 Крипто</span><span class="vals" style="text-align:right;">' + cryptoParts.join(', ') + '</span></div>');
     }
 
+    // Кредитні картки окремо
+    const creditRowsHtml = [];
+    allBanks().forEach(bank => {
+      const creditAccs = state.accounts.filter(a => a.bankId === bank.id && CREDIT_TYPES.includes(a.type));
+      if (!creditAccs.length) return;
+      const parts = creditAccs.map(a => (a.name !== 'Основний' ? a.name + ': ' : '') + fmtAmount(a.currency, a.balance));
+      creditRowsHtml.push('<div class="bank-row"><span class="name">' + bank.name + '</span><span class="vals">' + parts.join(' · ') + '</span></div>');
+    });
+
+    const creditSection = creditBreakdown ? '<div style="margin-top:12px;padding-top:12px;border-top:0.5px solid rgba(255,255,255,0.2);">' +
+      '<div style="font-size:11px;color:rgba(255,255,255,0.6);margin-bottom:4px;">КРЕДИТНІ КАРТКИ</div>' +
+      '<div style="font-size:20px;font-weight:700;color:rgba(255,255,255,0.9);">' + SYMS[targetCur] + fmt(creditTotal) + '</div>' +
+      '<div style="font-size:12px;color:rgba(255,255,255,0.6);margin-bottom:6px;">' + creditBreakdown + '</div>' +
+      '<div class="bank-rows">' + creditRowsHtml.join('') + '</div>' +
+    '</div>' : '';
+
     card.innerHTML = '<div class="accounts-total-card">' +
-      '<div class="label">Загальний баланс ' + currencySelector + '</div>' +
+      '<div class="label">Власні кошти ' + currencySelector + '</div>' +
       '<div class="value">' + SYMS[targetCur] + fmt(total) + '</div>' +
       (breakdown ? '<div class="breakdown">' + breakdown + '</div>' : '') +
       (rowsHtml.length ? '<div class="bank-rows">' + rowsHtml.join('') + '</div>' : '') +
+      creditSection +
     '</div>';
 
     const selEl = document.getElementById('accounts-currency-select');
