@@ -3463,14 +3463,15 @@
         msgEl.className = 'err';
         return;
       }
-      if (data.session) {
-        currentUser = data.user;
-        showApp();
-        initAppDataAndRoute();
-      } else {
+      if (data.user) {
+        // Завжди показуємо повідомлення про підтвердження пошти
         msgEl.innerHTML = '📧 <strong>Лист надіслано на пошту!</strong><br>Відкрий <strong>' + email + '</strong>, знайди лист від Supabase і натисни «Confirm email address».<br><br>Після підтвердження повернись сюди і натисни <strong>«Увійти»</strong>.';
         msgEl.className = 'info';
         setAuthMode('login');
+        // Якщо сесія вже є — все одно просимо підтвердити
+        if (data.session) {
+          await sb.auth.signOut(); // розлогінюємо щоб не заходив без підтвердження
+        }
       }
     }
   });
