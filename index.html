@@ -1464,7 +1464,8 @@
         name: row.account_name || 'Основний',
         type: row.account_type || 'debit',
         currency: row.currency,
-        balance: Number(row.balance)
+        balance: Number(row.balance),
+        creditLimit: row.credit_limit ? Number(row.credit_limit) : null
       }));
       // Агрегований балансовий словник для статистики/конвертації
       state.balances = {};
@@ -1563,21 +1564,23 @@
   }
 
   // Зберігає або оновлює іменований рахунок
-  async function saveBalance(bankId, currency, value, accName = 'Основний', accType = 'debit', existingId = null) {
+  async function saveBalance(bankId, currency, value, accName = 'Основний', accType = 'debit', existingId = null, creditLimit = null) {
     if (!currentUser) return false;
     try {
       let resId = existingId;
       let error;
+      const extra = creditLimit !== null ? { credit_limit: creditLimit } : {};
       if (existingId) {
         const res = await sb.from('account_balances').update({
-          balance: value, account_name: accName, account_type: accType,
+          balance: value, account_name: accName, account_type: accType, ...extra,
           updated_at: new Date().toISOString()
         }).eq('id', existingId);
         error = res.error;
       } else {
         const res = await sb.from('account_balances').insert({
           user_id: currentUser.id, bank_id: bankId, currency, balance: value,
-          account_name: accName, account_type: accType, updated_at: new Date().toISOString()
+          account_name: accName, account_type: accType, ...extra,
+          updated_at: new Date().toISOString()
         }).select().single();
         error = res.error;
         if (!error && res.data) resId = res.data.id;
@@ -1588,8 +1591,9 @@
         state.accounts[idx].balance = value;
         state.accounts[idx].name = accName;
         state.accounts[idx].type = accType;
+        if (creditLimit !== null) state.accounts[idx].creditLimit = creditLimit;
       } else {
-        state.accounts.push({ id: resId, bankId, name: accName, type: accType, currency, balance: value });
+        state.accounts.push({ id: resId, bankId, name: accName, type: accType, currency, balance: value, creditLimit });
       }
       rebuildAggregateBalances();
       return resId || true;
@@ -1994,6 +1998,29 @@
         '</div>';
       });
     });
+
+    // Доходи по категоріях
+    const incomeCurs = CURRENCIES.filter(cur =>
+      state.transactions.some(t => t.currency === cur && t.type === 'income' && txInPeriod(t, state.period) && !isPendingTx(t))
+    );
+    if (incomeCurs.length > 0) {
+      html += '<p class="section-title" style="margin-top:24px;">Доходи по категоріях</p>';
+      incomeCurs.forEach(cur => {
+        const txs = state.transactions.filter(t => t.currency === cur && t.type === 'income' && txInPeriod(t, state.period) && !isPendingTx(t));
+        const total = txs.reduce((s,t)=>s+Number(t.amount),0);
+        html += '<p style="font-size:12px; color:var(--text-muted); margin:14px 0 8px;">' + cur + '</p>';
+        CATEGORIES.income.forEach(cat => {
+          const sum = txs.filter(t=>t.category===cat.id).reduce((s,t)=>s+Number(t.amount),0);
+          if (sum === 0) return;
+          const pct = total > 0 ? Math.round((sum/total)*100) : 0;
+          html += '<div class="cat-row">' +
+            '<div class="top"><span class="name">' + cat.em + ' ' + cat.name + '</span><span class="amt" style="color:var(--success);">' + SYMS[cur] + fmt(sum) + ' · ' + pct + '%</span></div>' +
+            '<div class="bar-track"><div class="bar-fill" style="width:' + pct + '%;background:var(--success);"></div></div>' +
+          '</div>';
+        });
+      });
+    }
+
     catSection.innerHTML = html;
 
     // Реальні баланси по рахунках тепер на вкладці "Рахунки" — там вони автоматично
@@ -2703,10 +2730,12 @@
               '<div class="bank-head">' +
                 '<div><span class="bank-name">' + acc.name + '</span>' +
                 '<span style="font-size:11.5px; color:var(--text-muted); margin-left:8px;">' + typeLabel + ' · ' + acc.currency + '</span></div>' +
-                '<span style="font-size:14px; font-variant-numeric:tabular-nums;">' + SYMS[acc.currency] + fmt(acc.balance) + '</span>' +
+                '<span style="font-size:14px; font-variant-numeric:tabular-nums;">' + SYMS[acc.currency] + fmt(acc.balance) + (acc.creditLimit ? ' / ' + fmt(acc.creditLimit) : '') + '</span>' +
               '</div>' +
               '<div class="bank-balances" style="grid-template-columns:1fr 1fr; gap:6px; margin-top:8px;">' +
                 '<input type="text" inputmode="decimal" placeholder="Баланс" value="' + (acc.balance || '') + '" data-acc-id="' + acc.id + '" data-acc-balance>' +
+                (ACCOUNT_TYPE_LABELS[acc.type] && acc.type.includes('credit') ?
+                  '<input type="text" inputmode="decimal" placeholder="Кредитний ліміт" value="' + (acc.creditLimit || '') + '" data-acc-id="' + acc.id + '" data-acc-limit>' : '') +
                 '<button class="edit-bank-btn del-acc-btn" style="background:var(--danger-bg);color:var(--danger);border-color:var(--danger);" data-del-id="' + acc.id + '">Видалити</button>' +
               '</div>' +
             '</div>';
@@ -2727,7 +2756,8 @@
               '</select>' +
               '<select id="new-acc-currency">' + CURRENCIES.map(c => '<option value="' + c + '">' + c + '</option>').join('') + '</select>' +
             '</div>' +
-            '<input type="text" inputmode="decimal" id="new-acc-balance" placeholder="Початковий баланс (0)">' +
+            '<input type="text" inputmode="decimal" id="new-acc-balance" placeholder="Поточний баланс (0)">' +
+            '<input type="text" inputmode="decimal" id="new-acc-limit" placeholder="Кредитний ліміт (тільки для кредитних карток)" style="display:none;">' +
             '<button class="save-btn" style="margin-top:4px;" id="new-acc-save">Додати рахунок</button>' +
           '</div>' +
         '</div>';
@@ -2738,6 +2768,16 @@
           await saveBalance(null, null, val, null, null, inp.dataset.accId);
           renderAccountsTotal();
           populateAccountSelect();
+        });
+      });
+
+      wrap.querySelectorAll('[data-acc-limit]').forEach(inp => {
+        inp.addEventListener('change', async () => {
+          const val = parseFloat(inp.value.replace(',', '.')) || null;
+          const acc = state.accounts.find(a => a.id === inp.dataset.accId);
+          if (!acc) return;
+          await saveBalance(null, null, acc.balance, acc.name, acc.type, acc.id, val);
+          renderAccountsTotal();
         });
       });
 
@@ -2755,11 +2795,22 @@
         const type = document.getElementById('new-acc-type').value;
         const currency = document.getElementById('new-acc-currency').value;
         const balance = parseFloat(document.getElementById('new-acc-balance').value.replace(',', '.')) || 0;
-        await saveBalance(bank.id, currency, balance, name, type);
+        const limitVal = document.getElementById('new-acc-limit').value;
+        const creditLimit = (type.includes('credit') && limitVal) ? parseFloat(limitVal.replace(',', '.')) || null : null;
+        await saveBalance(bank.id, currency, balance, name, type, null, creditLimit);
         renderBankGroupDetail();
         renderAccountsTotal();
         populateAccountSelect();
       });
+
+      // Показуємо/ховаємо поле ліміту залежно від типу
+      const typeSelect = document.getElementById('new-acc-type');
+      const limitInput = document.getElementById('new-acc-limit');
+      if (typeSelect && limitInput) {
+        typeSelect.addEventListener('change', () => {
+          limitInput.style.display = typeSelect.value.includes('credit') ? 'block' : 'none';
+        });
+      }
 
       document.getElementById('flow-done').addEventListener('click', () => {
         accountFlowStep = null;
@@ -2859,8 +2910,29 @@
     allBanks().forEach(bank => {
       const creditAccs = state.accounts.filter(a => a.bankId === bank.id && CREDIT_TYPES.includes(a.type));
       if (!creditAccs.length) return;
-      const parts = creditAccs.map(a => (a.name !== 'Основний' ? a.name + ': ' : '') + fmtAmount(a.currency, a.balance));
-      creditRowsHtml.push('<div class="bank-row"><span class="name">' + bank.name + '</span><span class="vals">' + parts.join(' · ') + '</span></div>');
+      creditAccs.forEach(acc => {
+        const accName = acc.name !== 'Основний' ? acc.name : bank.name;
+        const used = acc.balance;
+        const limit = acc.creditLimit;
+        const available = limit !== null ? limit - used : null;
+        const pct = limit ? Math.min(100, Math.round((used / limit) * 100)) : 0;
+        let row = '<div style="margin-bottom:8px;">' +
+          '<div class="bank-row" style="margin-bottom:4px;">' +
+            '<span class="name">' + accName + '</span>' +
+            '<span class="vals">' + fmtAmount(acc.currency, used) + (limit ? ' / ' + fmtAmount(acc.currency, limit) : '') + '</span>' +
+          '</div>';
+        if (limit) {
+          row += '<div style="font-size:11px;color:rgba(255,255,255,0.6);display:flex;justify-content:space-between;margin-bottom:3px;">' +
+            '<span>Використано ' + pct + '%</span>' +
+            '<span>Доступно: ' + fmtAmount(acc.currency, available) + '</span>' +
+          '</div>' +
+          '<div style="height:3px;background:rgba(255,255,255,0.15);border-radius:2px;">' +
+            '<div style="height:100%;width:' + pct + '%;background:' + (pct > 80 ? '#ff6b6b' : 'rgba(255,255,255,0.6)') + ';border-radius:2px;"></div>' +
+          '</div>';
+        }
+        row += '</div>';
+        creditRowsHtml.push(row);
+      });
     });
 
     const creditSection = creditBreakdown ? '<div style="margin-top:12px;padding-top:12px;border-top:0.5px solid rgba(255,255,255,0.2);">' +
