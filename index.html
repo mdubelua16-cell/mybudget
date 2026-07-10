@@ -642,12 +642,12 @@
     font-variant-numeric: tabular-nums;
   }
   .accounts-total-card .breakdown {
-    font-size: 12px;
+    font-size: 13px;
     color: rgba(255,255,255,0.8);
-    margin-top: 8px;
+    margin-top: 6px;
     display: flex;
-    gap: 14px;
-    flex-wrap: wrap;
+    flex-direction: column;
+    gap: 2px;
   }
   .accounts-total-card .bank-rows {
     margin-top: 14px;
@@ -2875,8 +2875,8 @@
     });
 
     const breakdown = CURRENCIES.filter(c => sumsByCurrency[c] > 0)
-      .map(c => SYMS[c] + fmt(sumsByCurrency[c]))
-      .join(' &nbsp;·&nbsp; ');
+      .map(c => '<span>' + SYMS[c] + fmt(sumsByCurrency[c]) + '</span>')
+      .join('');
 
     const creditBreakdown = CURRENCIES.filter(c => creditSumsByCurrency[c] > 0)
       .map(c => SYMS[c] + fmt(creditSumsByCurrency[c]))
@@ -2890,12 +2890,19 @@
       rowsHtml.push('<div class="bank-row"><span class="name">💵 Готівка</span><span class="vals">' + cashParts.join(' · ') + '</span></div>');
     }
 
-    // Банки (тільки не кредитні)
+    // Банки (тільки не кредитні) — кожен рахунок окремим рядком
     allBanks().forEach(bank => {
       const bankAccs = state.accounts.filter(a => a.bankId === bank.id && a.balance && !CREDIT_TYPES.includes(a.type));
       if (!bankAccs.length) return;
-      const parts = bankAccs.map(a => (a.name !== 'Основний' ? a.name + ': ' : '') + fmtAmount(a.currency, a.balance));
-      rowsHtml.push('<div class="bank-row"><span class="name">' + bank.name + '</span><span class="vals">' + parts.join(' · ') + '</span></div>');
+      if (bankAccs.length === 1 && bankAccs[0].name === 'Основний') {
+        rowsHtml.push('<div class="bank-row"><span class="name">' + bank.name + '</span><span class="vals">' + fmtAmount(bankAccs[0].currency, bankAccs[0].balance) + '</span></div>');
+      } else {
+        // Кілька рахунків — показуємо назву банку, потім кожен рахунок з відступом
+        rowsHtml.push('<div class="bank-row"><span class="name" style="font-weight:600;">' + bank.name + '</span></div>');
+        bankAccs.forEach(a => {
+          rowsHtml.push('<div class="bank-row" style="padding-left:12px;"><span class="name" style="color:rgba(255,255,255,0.75);font-size:12px;">' + a.name + '</span><span class="vals">' + fmtAmount(a.currency, a.balance) + '</span></div>');
+        });
+      }
     });
 
     // Крипто останнє
