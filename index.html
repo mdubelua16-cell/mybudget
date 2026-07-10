@@ -1016,7 +1016,7 @@
       <p class="bank-group-title">Заощадження</p>
       <div id="savings-balance-card"></div>
 
-      <p class="bank-group-title">Очікувані повернення та борги</p>
+      <p class="bank-group-title">Повернення боргів та мої борги</p>
       <div id="owed-balance-card"></div>
     </div>
 
@@ -1138,7 +1138,7 @@
       {id:'cashback', name:'Кешбек', em:'💳'},
       {id:'investment', name:'Інвестиції', em:'📈'},
       {id:'sale', name:'Продаж речей', em:'🏷️'},
-      {id:'returns', name:'Очікувані повернення', em:'↩️'},
+      {id:'returns', name:'Повернули борг', em:'↩️'},
       {id:'other_income', name:'Інше', em:'➕', wide:true}
     ]
   };
@@ -1417,7 +1417,7 @@
       };
       state.transactions.push(newTx);
 
-      // Очікувані повернення / борги — це ще не здійснені рухи коштів, баланс рахунку не чіпаємо
+      // "Повернули борг" — фактично отримані/сплачені кошти, баланс рахунку коригується
       if (!isPendingTx(newTx)) {
         const delta = newTx.type === 'income' ? newTx.amount : -newTx.amount;
         // newTx.account зберігає account_id (uuid) конкретного рахунку
@@ -1681,7 +1681,7 @@
     return td >= s && td < e;
   }
 
-  // "Очікувані повернення" та "Борг" — це ще не здійснені рухи коштів.
+  // "Повернули борг" та "Борг" — це ще не здійснені рухи коштів.
   // Вони показуються окремо (зелена/червона картка) і не входять у фактичний баланс.
   function isPendingTx(tx) {
     if (tx.category === 'returns') return true;
@@ -1761,7 +1761,7 @@
 
   function renderDebtLinkRow(catId, subcatId) {
     const row = document.getElementById('debt-link-row');
-    // Показуємо для: Очікувані повернення (returns) або Зобовʼязання→Борг (obligations+obligation_debt)
+    // Показуємо для: Повернули борг (returns) або Зобовʼязання→Борг (obligations+obligation_debt)
     const isReturns = catId === 'returns';
     const isDebt = catId === 'obligations' && subcatId === 'obligation_debt';
     if (!isReturns && !isDebt) { row.style.display = 'none'; return; }
@@ -1870,16 +1870,7 @@
     const wrap = document.getElementById('owed-stats-cards');
 
     function calcTotal(direction) {
-      const txCat = direction === 'to_me' ? 'returns' : 'obligations';
-      const txType = direction === 'to_me' ? 'income' : 'expense';
       const totals = {};
-      // Не-трекерні транзакції
-      state.transactions.filter(t =>
-        t.category === txCat && t.type === txType &&
-        (direction === 'to_me' || t.subcategory === 'obligation_debt') &&
-        !t.debt_id
-      ).forEach(t => { totals[t.currency] = (totals[t.currency] || 0) + Number(t.amount); });
-      // Залишки активних боргів з трекера
       state.debts.filter(d => d.direction === direction && !d.is_closed).forEach(d => {
         const remaining = debtBalance(d);
         if (remaining > 0) totals[d.currency] = (totals[d.currency] || 0) + remaining;
@@ -1897,11 +1888,11 @@
 
     wrap.innerHTML = '<div class="owed-stats-grid">' +
       '<div class="owed-card owed-to-me">' +
-        '<div class="label">Винні мені (всього)</div>' +
+        '<div class="label">Винні мені</div>' +
         '<div class="value">' + (toMeParts.length ? toMeParts.join(' · ') : '—') + '</div>' +
       '</div>' +
       '<div class="owed-card owed-by-me">' +
-        '<div class="label">Я винен (всього)</div>' +
+        '<div class="label">Я винен</div>' +
         '<div class="value">' + (byMeParts.length ? byMeParts.join(' · ') : '—') + '</div>' +
       '</div>' +
     '</div>';
@@ -2341,44 +2332,22 @@
     }
 
     function sectionHtml(direction, label, cls) {
-      const txCat = direction === 'to_me' ? 'returns' : 'obligations';
-      const txType = direction === 'to_me' ? 'income' : 'expense';
-
-      // Транзакції БЕЗ прив'язки до трекера боргів — для загальної суми і окремих рядків
-      const relevantTxs = state.transactions.filter(t =>
-        t.category === txCat && t.type === txType &&
-        (direction === 'to_me' || t.subcategory === 'obligation_debt') &&
-        !t.debt_id  // виключаємо ті що прив'язані до трекера — вони вже в debtRow
-      ).sort((a,b) => new Date(b.date) - new Date(a.date));
-
-      // Для загальної суми беремо НЕ-трекерні транзакції + залишки з трекера
-      const txTotals = {};
-      relevantTxs.forEach(t => { txTotals[t.currency] = (txTotals[t.currency] || 0) + Number(t.amount); });
-
-      // Додаємо залишки активних боргів з трекера
       const debts = state.debts.filter(d => d.direction === direction && !d.is_closed);
       const closedDebts = state.debts.filter(d => d.direction === direction && d.is_closed);
+
+      // Загальна сума = лише залишки активних боргів з трекера
+      const totals = {};
       debts.forEach(d => {
         const remaining = debtBalance(d);
-        if (remaining > 0) txTotals[d.currency] = (txTotals[d.currency] || 0) + remaining;
+        if (remaining > 0) totals[d.currency] = (totals[d.currency] || 0) + remaining;
       });
-
-      const txParts = CURRENCIES.filter(c => txTotals[c]).map(c => SYMS[c] + fmt(txTotals[c]));
-
-      const txRows = relevantTxs.length ? relevantTxs.map(t => {
-        const d = new Date(t.date + 'T00:00:00').toLocaleDateString('uk-UA', {day:'numeric', month:'short'});
-        return '<div style="display:flex;justify-content:space-between;align-items:center;font-size:13px;padding:6px 0;border-top:0.5px solid rgba(255,255,255,0.15);">' +
-          '<span style="color:rgba(255,255,255,0.85);">' + d + (t.note ? ' · ' + escapeHtml(t.note) : '') + '</span>' +
-          '<span style="font-weight:600;">' + fmtAmount(t.currency, t.amount) + '</span>' +
-        '</div>';
-      }).join('') : '';
+      const parts = CURRENCIES.filter(c => totals[c]).map(c => SYMS[c] + fmt(totals[c]));
 
       return '<div class="owed-card ' + cls + '" style="margin-bottom:8px;">' +
         '<div class="label">' + label + '</div>' +
-        '<div class="value">' + (txParts.length ? txParts.join(' · ') : '—') + '</div>' +
-        (txRows ? '<div style="margin-top:8px;">' + txRows + '</div>' : '') +
+        '<div class="value">' + (parts.length ? parts.join(' · ') : '—') + '</div>' +
         debts.map(debtRow).join('') +
-        (closedDebts.length ? '<div style="font-size:11.5px;color:rgba(255,255,255,0.5);margin-top:8px;">Трекер закритих: ' + closedDebts.map(d => escapeHtml(d.person_name)).join(', ') + '</div>' : '') +
+        (closedDebts.length ? '<div style="font-size:11.5px;color:rgba(255,255,255,0.5);margin-top:8px;">Закриті: ' + closedDebts.map(d => escapeHtml(d.person_name)).join(', ') + '</div>' : '') +
         '<button class="edit-bank-btn" style="width:100%;text-align:center;margin-top:10px;color:rgba(255,255,255,0.9);background:rgba(255,255,255,0.15);border-color:rgba(255,255,255,0.3);" id="add-debt-' + direction + '">+ Додати борг до трекера</button>' +
       '</div>';
     }
