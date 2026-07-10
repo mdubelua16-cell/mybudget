@@ -2058,16 +2058,28 @@
       const isIncome = tx.type === 'income';
       const dateStr = new Date(tx.date + 'T00:00:00').toLocaleDateString('uk-UA', {day:'numeric', month:'short'});
       const accLabel = accountDisplayName(tx.account);
-      return '<div class="tx-item">' +
-        '<div class="tx-left">' +
-          '<div class="tx-icon">' + info.em + '</div>' +
-          '<div><p class="tx-name">' + displayName + '</p>' +
-          '<p class="tx-meta">' + dateStr + ' · ' + accLabel + (tx.note ? ' · ' + escapeHtml(tx.note) : '') + '</p></div>' +
+
+      // Кнопка прив'язки до боргу для транзакцій "Повернули борг" без debt_id
+      const canLink = (tx.category === 'returns' || (tx.category === 'obligations' && tx.subcategory === 'obligation_debt')) && !tx.debt_id;
+      const direction = tx.category === 'returns' ? 'to_me' : 'by_me';
+      const availableDebts = canLink ? state.debts.filter(d => d.direction === direction && !d.is_closed && d.currency === tx.currency) : [];
+      const linkBtn = availableDebts.length
+        ? '<button class="edit-bank-btn" style="font-size:11px;padding:3px 8px;color:var(--accent);border-color:var(--accent);" data-link-tx="' + tx.id + '" data-link-dir="' + direction + '">Прив\'язати до боргу</button>'
+        : '';
+
+      return '<div class="tx-item" style="flex-direction:column;align-items:stretch;">' +
+        '<div style="display:flex;justify-content:space-between;align-items:center;">' +
+          '<div class="tx-left">' +
+            '<div class="tx-icon">' + info.em + '</div>' +
+            '<div><p class="tx-name">' + displayName + '</p>' +
+            '<p class="tx-meta">' + dateStr + ' · ' + accLabel + (tx.note ? ' · ' + escapeHtml(tx.note) : '') + '</p></div>' +
+          '</div>' +
+          '<div style="display:flex; align-items:center; gap:6px;">' +
+            '<span class="tx-amt ' + (isIncome?'in':'out') + '">' + (isIncome?'+':'-') + SYMS[tx.currency] + fmt(tx.amount) + '</span>' +
+            '<button class="del-btn" data-id="' + tx.id + '">✕</button>' +
+          '</div>' +
         '</div>' +
-        '<div style="display:flex; align-items:center; gap:6px;">' +
-          '<span class="tx-amt ' + (isIncome?'in':'out') + '">' + (isIncome?'+':'-') + SYMS[tx.currency] + fmt(tx.amount) + '</span>' +
-          '<button class="del-btn" data-id="' + tx.id + '">✕</button>' +
-        '</div>' +
+        (linkBtn ? '<div style="margin-top:6px;">' + linkBtn + '</div>' : '') +
       '</div>';
     }).join('');
 
@@ -2077,6 +2089,53 @@
         if (ok) { renderList(); renderStats(); }
       });
     });
+
+    listEl.querySelectorAll('[data-link-tx]').forEach(btn => {
+      btn.addEventListener('click', async () => {
+        const txId = btn.dataset.linkTx;
+        const direction = btn.dataset.linkDir;
+        const tx = state.transactions.find(t => String(t.id) === String(txId));
+        if (!tx) return;
+        const availableDebts = state.debts.filter(d => d.direction === direction && !d.is_closed && d.currency === tx.currency);
+        if (!availableDebts.length) return;
+
+        // Простий вибір якщо один борг — відразу прив'язуємо
+        if (availableDebts.length === 1) {
+          await linkTxToDebt(txId, availableDebts[0].id);
+          return;
+        }
+
+        // Кілька боргів — показуємо вибір
+        const debtOptions = availableDebts.map(d =>
+          '<option value="' + d.id + '">' + escapeHtml(d.person_name) + ' (' + SYMS[d.currency] + fmt(debtBalance(d)) + ' залишок)</option>'
+        ).join('');
+        const wrap = btn.parentElement;
+        wrap.innerHTML = '<select id="link-debt-select" style="flex:1;font-size:13px;">' + debtOptions + '</select>' +
+          '<button class="edit-bank-btn" id="link-debt-confirm" style="color:var(--accent);border-color:var(--accent);">OK</button>';
+        document.getElementById('link-debt-confirm').addEventListener('click', async () => {
+          const debtId = document.getElementById('link-debt-select').value;
+          await linkTxToDebt(txId, debtId);
+        });
+      });
+    });
+  }
+
+  async function linkTxToDebt(txId, debtId) {
+    try {
+      const { error } = await sb.from('transactions').update({ debt_id: debtId }).eq('id', txId);
+      if (error) throw error;
+      const tx = state.transactions.find(t => String(t.id) === String(txId));
+      if (tx) tx.debt_id = debtId;
+      // Перевіряємо чи борг закритий
+      await loadDebts();
+      const debt = state.debts.find(d => d.id === debtId);
+      if (debt && debtBalance(debt) <= 0) {
+        await saveDebt({ is_closed: true }, debtId);
+      }
+      renderList();
+      renderOwedBalance();
+      renderOwedStatsCards();
+    } catch (e) { console.log('linkTxToDebt error', e.message); }
   }
 
   // ---- accounts render ----
