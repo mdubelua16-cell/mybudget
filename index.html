@@ -1148,6 +1148,7 @@
   };
   const CURRENCIES = ['EUR','UAH','USD','PLN'];
   const SYMS = {EUR:'€', UAH:'₴', USD:'$', PLN:'zł', BTC:'₿', ETH:'Ξ', USDT:'₮', SOL:'◎', XRP:'XRP', TRUMP:'TRUMP'};
+  const CREDIT_TYPES = ['credit', 'credit_fop'];
   function fmtAmount(currency, amount) {
     const sym = SYMS[currency];
     if (!sym) return fmt(amount) + ' ' + currency;
