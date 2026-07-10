@@ -1142,6 +1142,7 @@
       {id:'investment', name:'Інвестиції', em:'📈'},
       {id:'sale', name:'Продаж речей', em:'🏷️'},
       {id:'returns', name:'Повернули борг', em:'↩️'},
+      {id:'credit_payment', name:'Погашення кредиту', em:'💳'},
       {id:'other_income', name:'Інше', em:'➕', wide:true}
     ]
   };
@@ -1630,7 +1631,11 @@
     const acc = state.accounts.find(a => a.id === accountId);
     if (!acc) return false;
     try {
-      const newValue = acc.balance + delta;
+      // Для кредитних карток логіка зворотня:
+      // витрата (delta < 0) збільшує борг, погашення (delta > 0) зменшує борг
+      const CREDIT_TYPES = ['credit', 'credit_fop'];
+      const effectiveDelta = CREDIT_TYPES.includes(acc.type) ? -delta : delta;
+      const newValue = acc.balance + effectiveDelta;
       const { error } = await sb.from('account_balances').update({
         balance: newValue, updated_at: new Date().toISOString()
       }).eq('id', accountId);
@@ -1694,9 +1699,8 @@
   // "Повернули борг" та "Борг" — це ще не здійснені рухи коштів.
   // Вони показуються окремо (зелена/червона картка) і не входять у фактичний баланс.
   function isPendingTx(tx) {
-    // Тільки "Зобовʼязання → Борг" вважається очікуваним (ще не сплаченим)
-    // "Очікувані повернення" — це вже ОТРИМАНИЙ дохід, рахується в статистиці
     if (tx.category === 'obligations' && tx.subcategory === 'obligation_debt') return true;
+    if (tx.category === 'credit_payment') return true; // технічна операція, не дохід
     return false;
   }
 
@@ -2639,18 +2643,23 @@
       const available = limit !== null ? limit - used : null;
       const pct = limit ? Math.min(100, Math.round((used / limit) * 100)) : 0;
 
-      // Транзакції з цієї кредитної картки
+      // Всі транзакції з цієї кредитної картки (і витрати і погашення)
       const accTxs = state.transactions
-        .filter(t => t.account === acc.id && t.type === 'expense')
+        .filter(t => t.account === acc.id)
         .sort((a,b) => new Date(b.date) - new Date(a.date))
-        .slice(0, 5);
+        .slice(0, 8);
 
       const txRows = accTxs.map(t => {
         const d = new Date(t.date + 'T00:00:00').toLocaleDateString('uk-UA', {day:'numeric', month:'short'});
-        const cat = CATEGORIES.expense.find(c => c.id === t.category);
+        const cat = t.type === 'expense'
+          ? CATEGORIES.expense.find(c => c.id === t.category)
+          : CATEGORIES.income.find(c => c.id === t.category);
+        const isPayment = t.type === 'income';
         return '<div style="display:flex;justify-content:space-between;font-size:12px;color:rgba(255,255,255,0.75);padding:4px 0;border-top:0.5px solid rgba(255,255,255,0.15);">' +
-          '<span>' + (cat ? cat.em + ' ' : '') + d + (t.note ? ' · ' + escapeHtml(t.note) : '') + '</span>' +
-          '<span>-' + fmtAmount(acc.currency, t.amount) + '</span>' +
+          '<span>' + (cat ? cat.em + ' ' : (isPayment ? '💳 ' : '')) + d + (t.note ? ' · ' + escapeHtml(t.note) : '') + '</span>' +
+          '<span style="color:' + (isPayment ? 'rgba(100,255,150,0.9)' : 'rgba(255,255,255,0.9)') + ';">' +
+            (isPayment ? '+' : '-') + fmtAmount(acc.currency, t.amount) +
+          '</span>' +
         '</div>';
       }).join('');
 
@@ -2719,11 +2728,11 @@
         const date = document.getElementById('cpay-date-' + acc.id).value;
         if (!amount || amount <= 0) return;
         saveBtn.textContent = 'Збереження…'; saveBtn.disabled = true;
-        const payNote = note || 'Погашення кредиту';
+        const payNote = note || 'Погашення кредиту · ' + acc.name;
         // 1. Дохід на кредитну картку (зменшує борг)
         const ok1 = await insertTransactionWithDebt({
           type: 'income', amount, currency: acc.currency,
-          account: acc.id, category: 'other', subcategory: null,
+          account: acc.id, category: 'credit_payment', subcategory: null,
           note: payNote, date
         });
         // 2. Витрата з рахунку-джерела
@@ -2731,7 +2740,7 @@
           const srcAcc = state.accounts.find(a => a.id === sourceId);
           if (srcAcc) await insertTransactionWithDebt({
             type: 'expense', amount, currency: srcAcc.currency,
-            account: sourceId, category: 'other', subcategory: null,
+            account: sourceId, category: 'obligations', subcategory: null,
             note: 'Поповнення кредитки · ' + acc.name, date
           });
         }
