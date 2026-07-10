@@ -1494,7 +1494,9 @@
     try {
       let res;
       if (existingId) {
-        res = await sb.from('debts').update({ ...debtData, updated_at: new Date().toISOString() }).eq('id', existingId).select().single();
+        // Не передаємо updated_at — цієї колонки немає в таблиці debts
+        const { updated_at, ...cleanData } = debtData;
+        res = await sb.from('debts').update(cleanData).eq('id', existingId).select().single();
       } else {
         res = await sb.from('debts').insert({ ...debtData, user_id: currentUser.id }).select().single();
       }
@@ -2448,12 +2450,22 @@
       const amount = parseFloat(document.getElementById('debt-amount').value.replace(',', '.'));
       const currency = document.getElementById('debt-currency').value;
       const desc = document.getElementById('debt-desc').value.trim();
-      if (!person || !amount) return;
-      await saveDebt({ person_name: person, direction: addingDebt, original_amount: amount, currency, description: desc || null });
-      addingDebt = null;
-      owedDetailsExpanded[addingDebt === 'to_me' ? 'toMe' : 'byMe'] = true;
-      renderOwedBalance();
-      renderOwedStatsCards();
+      if (!person || !amount || amount <= 0) {
+        alert('Введи імʼя та суму боргу'); return;
+      }
+      const direction = addingDebt; // зберігаємо до скидання
+      saveBtn.textContent = 'Збереження…';
+      saveBtn.disabled = true;
+      const result = await saveDebt({ person_name: person, direction, original_amount: amount, currency, description: desc || null });
+      if (result) {
+        addingDebt = null;
+        renderOwedBalance();
+        renderOwedStatsCards();
+      } else {
+        saveBtn.textContent = 'Зберегти';
+        saveBtn.disabled = false;
+        alert('Помилка збереження. Перевір зʼєднання.');
+      }
     });
     document.getElementById('debt-cancel-btn') && document.getElementById('debt-cancel-btn').addEventListener('click', () => { addingDebt = null; renderOwedBalance(); });
 
