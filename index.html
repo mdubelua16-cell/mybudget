@@ -1631,12 +1631,11 @@
     if (!currentUser) return false;
     const acc = state.accounts.find(a => a.id === accountId);
     if (!acc) return false;
+    // Для кредитних карток НЕ змінюємо balance — він зберігає власні кошти
+    // Борг рахується автоматично з транзакцій у calcCreditBalance
+    if (CREDIT_TYPES.includes(acc.type)) return true;
     try {
-      // Для кредитних карток логіка зворотня:
-      // витрата (delta < 0) збільшує борг, погашення (delta > 0) зменшує борг
-      const CREDIT_TYPES = ['credit', 'credit_fop'];
-      const effectiveDelta = CREDIT_TYPES.includes(acc.type) ? -delta : delta;
-      const newValue = acc.balance + effectiveDelta;
+      const newValue = acc.balance + delta;
       const { error } = await sb.from('account_balances').update({
         balance: newValue, updated_at: new Date().toISOString()
       }).eq('id', accountId);
