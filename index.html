@@ -2654,9 +2654,24 @@
         '</div>';
       }).join('');
 
+      const isFullyPaid = limit && used <= 0;
+      const cardBg = isFullyPaid
+        ? 'background:linear-gradient(135deg,#1f7a52 0%,#1d6f6f 100%);'
+        : 'background:linear-gradient(135deg,#8a3a6f 0%,#c2553c 100%);';
+
+      const sourceOptions = '<option value="">— Звідки поповнюєш —</option>' +
+        '<option value="__terminal__">🏧 Термінал / банкомат</option>' +
+        '<option value="__other__">💸 Інше</option>' +
+        state.accounts.filter(a => a.id !== acc.id && a.balance > 0).map(a => {
+          const bName = a.bankId === 'cash' ? '💵 Готівка' : a.bankId === 'crypto' ? '🪙 Крипто' : bankName(a.bankId);
+          const label = a.name !== 'Основний' ? bName + ' · ' + a.name : bName;
+          return '<option value="' + a.id + '">' + label + ' (' + fmtAmount(a.currency, a.balance) + ')</option>';
+        }).join('');
+
       const payForm = creditPayForms[acc.id] ? (
         '<div style="margin-top:10px;">' +
           '<input type="text" inputmode="decimal" placeholder="Сума погашення" style="' + inputStyle + '" id="cpay-amount-' + acc.id + '">' +
+          '<select style="' + inputStyle + 'color:#333;margin-bottom:8px;" id="cpay-source-' + acc.id + '">' + sourceOptions + '</select>' +
           '<input type="text" placeholder="Коментар (опційно)" style="' + inputStyle + '" id="cpay-note-' + acc.id + '">' +
           '<input type="date" style="' + inputStyle + '" id="cpay-date-' + acc.id + '" value="' + new Date().toISOString().split('T')[0] + '">' +
           '<div style="display:flex;gap:8px;">' +
@@ -2666,22 +2681,22 @@
         '</div>'
       ) : '';
 
-      return '<div style="' + cardStyle + '" data-credit-acc="' + acc.id + '">' +
+      return '<div style="' + cardBg + 'border-radius:var(--radius);padding:16px 18px;margin-bottom:8px;color:#fff;" data-credit-acc="' + acc.id + '">' +
         '<div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:8px;">' +
           '<div><div style="font-size:14px;font-weight:600;">' + bankLabel + ' · ' + acc.name + '</div>' +
           '<div style="font-size:11.5px;color:rgba(255,255,255,0.65);">' + acc.currency + (acc.type === 'credit_fop' ? ' · ФОП' : '') + '</div></div>' +
           '<div style="text-align:right;">' +
-            '<div style="font-size:15px;font-weight:700;">' + fmtAmount(acc.currency, used) + ' використано</div>' +
+            '<div style="font-size:15px;font-weight:700;">' + fmtAmount(acc.currency, used) + (isFullyPaid ? ' ✓' : ' використано') + '</div>' +
             (limit ? '<div style="font-size:11px;color:rgba(255,255,255,0.65);">з ' + fmtAmount(acc.currency, limit) + ' ліміту</div>' : '') +
           '</div>' +
         '</div>' +
         (limit ? (
           '<div style="height:4px;background:rgba(255,255,255,0.15);border-radius:2px;margin-bottom:6px;">' +
-            '<div style="height:100%;width:' + pct + '%;background:' + (pct > 80 ? '#ff8080' : 'rgba(255,255,255,0.7)') + ';border-radius:2px;"></div>' +
+            '<div style="height:100%;width:' + Math.min(100,pct) + '%;background:' + (isFullyPaid ? 'rgba(100,255,150,0.8)' : pct > 80 ? '#ff8080' : 'rgba(255,255,255,0.7)') + ';border-radius:2px;"></div>' +
           '</div>' +
           '<div style="display:flex;justify-content:space-between;font-size:11.5px;color:rgba(255,255,255,0.7);margin-bottom:10px;">' +
-            '<span>Використано ' + pct + '%</span>' +
-            '<span>Доступно: ' + fmtAmount(acc.currency, available) + '</span>' +
+            '<span>' + (isFullyPaid ? '✓ Повністю погашено' : 'Використано ' + pct + '%') + '</span>' +
+            (available !== null ? '<span>Доступно: ' + fmtAmount(acc.currency, available) + '</span>' : '') +
           '</div>'
         ) : '') +
         (txRows ? '<div style="margin-bottom:8px;">' + txRows + '</div>' : '') +
@@ -2691,40 +2706,37 @@
       '</div>';
     }).join('');
 
-    // Обробники
     creditAccs.forEach(acc => {
       const openBtn = document.getElementById('cpay-open-' + acc.id);
-      if (openBtn) openBtn.addEventListener('click', () => {
-        creditPayForms[acc.id] = true;
-        renderCreditTracker();
-      });
+      if (openBtn) openBtn.addEventListener('click', () => { creditPayForms[acc.id] = true; renderCreditTracker(); });
       const cancelBtn = document.getElementById('cpay-cancel-' + acc.id);
-      if (cancelBtn) cancelBtn.addEventListener('click', () => {
-        creditPayForms[acc.id] = false;
-        renderCreditTracker();
-      });
+      if (cancelBtn) cancelBtn.addEventListener('click', () => { creditPayForms[acc.id] = false; renderCreditTracker(); });
       const saveBtn = document.getElementById('cpay-save-' + acc.id);
       if (saveBtn) saveBtn.addEventListener('click', async () => {
         const amount = parseFloat(document.getElementById('cpay-amount-' + acc.id).value.replace(',', '.'));
+        const sourceId = document.getElementById('cpay-source-' + acc.id).value;
         const note = document.getElementById('cpay-note-' + acc.id).value.trim();
         const date = document.getElementById('cpay-date-' + acc.id).value;
         if (!amount || amount <= 0) return;
-        saveBtn.textContent = 'Збереження…';
-        saveBtn.disabled = true;
-        // Погашення = зменшення балансу кредитної картки (дохід на картку)
-        const ok = await insertTransactionWithDebt({
+        saveBtn.textContent = 'Збереження…'; saveBtn.disabled = true;
+        const payNote = note || 'Погашення кредиту';
+        // 1. Дохід на кредитну картку (зменшує борг)
+        const ok1 = await insertTransactionWithDebt({
           type: 'income', amount, currency: acc.currency,
           account: acc.id, category: 'other', subcategory: null,
-          note: note || 'Погашення кредиту', date
+          note: payNote, date
         });
-        if (ok) {
-          creditPayForms[acc.id] = false;
-          renderCreditTracker();
-          renderAccountsTotal();
-        } else {
-          saveBtn.textContent = 'Зберегти';
-          saveBtn.disabled = false;
+        // 2. Витрата з рахунку-джерела
+        if (ok1 && sourceId && sourceId !== '__terminal__' && sourceId !== '__other__' && sourceId !== '') {
+          const srcAcc = state.accounts.find(a => a.id === sourceId);
+          if (srcAcc) await insertTransactionWithDebt({
+            type: 'expense', amount, currency: srcAcc.currency,
+            account: sourceId, category: 'other', subcategory: null,
+            note: 'Поповнення кредитки · ' + acc.name, date
+          });
         }
+        if (ok1) { creditPayForms[acc.id] = false; renderCreditTracker(); renderAccountsTotal(); }
+        else { saveBtn.textContent = 'Зберегти'; saveBtn.disabled = false; }
       });
     });
   }
