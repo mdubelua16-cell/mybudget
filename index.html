@@ -3226,7 +3226,8 @@
 
     BANK_GROUPS.forEach(group => {
       group.banks.forEach(bank => {
-        const accs = (byBank[bank.id] || []).filter(a => a.balance);
+        // Кредитні показуємо завжди, дебетові — тільки з балансом
+        const accs = (byBank[bank.id] || []).filter(a => CREDIT_TYPES.includes(a.type) || a.balance);
         if (accs.length) {
           html += '<optgroup label="' + bank.name + '">';
           accs.forEach(a => {
