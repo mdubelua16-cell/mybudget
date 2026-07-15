@@ -1020,23 +1020,23 @@
       <div id="accounts-empty-banner"></div>
       <div id="accounts-total-card"></div>
 
-      <p class="bank-group-title" style="margin-top:4px;">Готівка</p>
+      <p class="bank-group-title" style="margin-top:4px;" data-i18n="cash">Готівка</p>
       <div id="cash-balance-card"></div>
 
-      <p class="bank-group-title">Банки</p>
+      <p class="bank-group-title" data-i18n="banks_section">Банки</p>
       <div id="bank-group-selector"></div>
       <div id="bank-group-detail"></div>
 
-      <p class="bank-group-title">Криптовалюта</p>
+      <p class="bank-group-title" data-i18n="crypto_section">Криптовалюта</p>
       <div id="crypto-balance-card"></div>
 
-      <p class="bank-group-title">Заощадження</p>
+      <p class="bank-group-title" data-i18n="savings_section">Заощадження</p>
       <div id="savings-balance-card"></div>
 
-      <p class="bank-group-title">Повернення боргів та мої борги</p>
+      <p class="bank-group-title" data-i18n="debts_section">Повернення боргів та мої борги</p>
       <div id="owed-balance-card"></div>
 
-      <p class="bank-group-title" id="credit-tracker-title" style="display:none;">Кредитні картки — трекер</p>
+      <p class="bank-group-title" id="credit-tracker-title" style="display:none;" data-i18n="credit_tracker_section">Кредитні картки — трекер</p>
       <div id="credit-tracker-card"></div>
     </div>
 
@@ -1187,9 +1187,9 @@
       tab_stats: 'Статистика', tab_add: 'Додати', tab_list: 'Записи', tab_accounts: 'Рахунки',
       // Periods
       day: 'День', week: 'Тиждень', month: 'Місяць', year: 'Рік',
-      refresh_rate: 'Оновити курс',
+      refresh_rate: t('refresh_rates_btn'),
       // Stats
-      total: 'Загалом', monthly_limit: 'Місячний ліміт витрат', change: 'Змінити',
+      total: 'Загалом', monthly_limit: t('period_label_monthly'), change: 'Змінити',
       remaining: 'Залишилось', expenses_by_cat: 'ВИТРАТИ ПО КАТЕГОРІЯХ', income_by_cat: 'ДОХОДИ ПО КАТЕГОРІЯХ',
       owed_to_me: 'Винні мені (всього)', owed_by_me: 'Я винен (всього)',
       // Add form
@@ -1210,28 +1210,65 @@
       add_account: '+ Додати рахунок', new_account: '+ Новий рахунок',
       acc_name_ph: 'Назва (напр. Біла картка)', balance_ph: 'Поточний баланс (0)',
       credit_limit_ph: 'Кредитний ліміт (тільки для кредитних карток)',
-      btn_edit: 'Редагувати', btn_done: 'Готово', btn_cancel: 'Скасувати',
+      btn_edit: t('btn_edit'), btn_done: t('btn_done'), btn_cancel: t('cancel'),
       btn_delete: 'Видалити', btn_save: 'Зберегти', btn_add_account: 'Додати рахунок',
       savings: 'ЗАОЩАДЖЕННЯ', savings_total: 'Заощадження (всього)',
-      no_records: 'Немає записів.',
+      no_records: t('no_records'),
       debts_title: 'ПОВЕРНЕННЯ БОРГІВ ТА МОЇ БОРГИ',
-      owed_me_card: 'Винні мені', owed_by_card: 'Я винен',
-      add_debt: '+ Додати борг до трекера',
+      owed_me_card: t('owed_me_section'), owed_by_card: t('owed_by_section'),
+      add_debt: t('add_debt_btn'),
       new_debt_to_me: '+ Хто мені винен', new_debt_by_me: '+ Кому я винен',
       debt_who: 'Хто винен', debt_whom: 'Кому винен', debt_amount: 'Сума боргу',
       debt_currency: 'Валюта', debt_desc: 'Опис (опційно)', debt_save: 'Зберегти',
-      debt_remaining: 'залишок', debt_paid: 'Закрито', debt_payment: '+ Повернення',
-      debt_closed: 'Закриті:', saving_btn: 'Збереження…',
+      debt_remaining: t('debt_remaining_label'), debt_paid: 'Закрито', debt_payment: t('debt_payment'),
+      debt_closed: t('closed_label'), saving_btn: 'Збереження…',
       credit_tracker: 'КРЕДИТНІ КАРТКИ — ТРЕКЕР',
       own_funds_label: '💳 Власні кошти:', available: 'Доступно:',
-      credit_used: 'Використано', credit_paid: '✓ Повністю погашено',
-      credit_remainder: '✓ Залишок на картці', repay: '+ Погасити кредит',
-      repay_source: '— Звідки поповнюєш —', terminal: '🏧 Термінал / банкомат', other_source: '💸 Інше',
+      credit_used: 'Використано', credit_paid: t('fully_repaid'),
+      credit_remainder: t('balance_label'), repay: t('btn_repay'),
+      repay_source: t('repay_source_ph'), terminal: t('terminal_label'), other_source: '💸 Інше',
       repay_amount_ph: 'Сума погашення', repay_note_ph: 'Коментар (опційно)',
       budget_title: 'Бюджет', new_record: 'Новий запис', all_records_title: 'Всі записи',
       accounts_title: 'Рахунки',
       select_account_ph: 'Натисни, щоб обрати готівку, банк або гаманець',
-      all_countries: 'Всі', cancel: 'Скасувати',
+      all_countries: 'Всі', cancel: t('cancel'),
+      // Categories
+      cat_food:'Їжа', cat_transport:'Транспорт', cat_housing:'Житло', cat_kids:'Діти',
+      cat_fun:'Розваги', cat_clothes:'Одяг', cat_health:"Здоров'я", cat_rest:'Відпочинок',
+      cat_travel:'Туризм/подорожі', cat_restaurant:'Ресторани/кафе', cat_subscriptions:'Підписки',
+      cat_education:'Освіта', cat_documents:'Документи/візи', cat_gifts:'Подарунки',
+      cat_charity:'Благодійність', cat_connection:'Звʼязок', cat_self_care:'Догляд за собою',
+      cat_household:'Побут та дім', cat_pets:'Тварини', cat_savings:'Заощадження',
+      cat_obligations:'Зобовʼязання', cat_other_expense:'Інше', cat_income:'Зарплата',
+      cat_side_job:'Підробіток', cat_freelance:'Фриланс', cat_gift_money:'Подарунок грошима',
+      cat_deposit_interest:'Відсотки депозиту', cat_cashback:'Кешбек',
+      cat_investment:'Інвестиції', cat_sale:'Продаж речей', cat_returns:'Повернули борг',
+      cat_credit_payment:'Погашення кредиту', cat_other_income:'Інше',
+      sub_savings_home:'На житло', sub_savings_reserve:'Резерв', sub_savings_education:'На навчання',
+      sub_savings_car:'Авто', sub_savings_rest:'Відпочинок', sub_savings_renovation:'Ремонт',
+      sub_savings_other:'Інше', sub_obligation_loan:'Кредит', sub_obligation_debt:'Борг',
+      sub_obligation_lease:'Лізинг/розстрочка',
+      type_debit:'Дебітова · Особистий', type_debit_fop:'Дебітова · ФОП',
+      type_credit:'Кредитна · Особистий', type_credit_fop:'Кредитна · ФОП',
+      type_cashback:'Кешбек', type_savings_jar:'Копілка', type_other:'Інший',
+      cash_section:'ГОТІВКА', banks_section:'БАНКИ', crypto_section:'КРИПТОВАЛЮТА',
+      savings_section:'ЗАОЩАДЖЕННЯ', debts_section:'ПОВЕРНЕННЯ БОРГІВ ТА МОЇ БОРГИ',
+      credit_tracker_section:'КРЕДИТНІ КАРТКИ — ТРЕКЕР',
+      owed_me_section:t('owed_me_section'), owed_by_section:t('owed_by_section'),
+      btn_repay:t('btn_repay'), repay_source_ph:t('repay_source_ph'),
+      terminal_label:t('terminal_label'), other_label:'💸 Інше',
+      fully_repaid:t('fully_repaid'), balance_label:t('balance_label'),
+      used_label:'Використано', own_funds_txt:'💳 Власні кошти:',
+      debt_remaining_label:t('debt_remaining_label'), closed_label:t('closed_label'),
+      add_debt_btn:t('add_debt_btn'), add_new_debt_btn:'+ Новий борг',
+      who_owes:'Хто мені винен', whom_i_owe:'Кому я винен',
+      debt_amount_label:'Сума боргу', debt_desc_label:'Опис (опційно)',
+      save_btn:'Зберегти', cancel_btn:t('cancel'), edit_btn:t('btn_edit'),
+      delete_btn:'Видалити', done_btn:t('btn_done'), saving_label:'Збереження…',
+      refresh_rates_btn:t('refresh_rates_btn'),
+      total_label:'Загалом', own_funds_title:'Власні кошти', credit_cards_title:'КРЕДИТНІ КАРТКИ',
+      debt_label:'борг', remainder_label:t('debt_remaining_label'),
+      period_label_monthly:t('period_label_monthly'), change_btn:'Змінити', remaining_label:'Залишилось',
     },
     en: {
       // Auth
@@ -1296,9 +1333,54 @@
       accounts_title: 'Accounts',
       select_account_ph: 'Tap to select cash, bank or wallet',
       all_countries: 'All', cancel: 'Cancel',
+      // Categories
+      cat_food:'Food', cat_transport:'Transport', cat_housing:'Housing', cat_kids:'Kids',
+      cat_fun:'Entertainment', cat_clothes:'Clothing', cat_health:'Health', cat_rest:'Leisure',
+      cat_travel:'Travel', cat_restaurant:'Restaurants/cafes', cat_subscriptions:'Subscriptions',
+      cat_education:'Education', cat_documents:'Documents/visas', cat_gifts:'Gifts',
+      cat_charity:'Charity', cat_connection:'Communication', cat_self_care:'Self-care',
+      cat_household:'Household', cat_pets:'Pets', cat_savings:'Savings', cat_obligations:'Obligations',
+      cat_other_expense:'Other', cat_income:'Salary', cat_side_job:'Side job',
+      cat_freelance:'Freelance', cat_gift_money:'Gift money', cat_deposit_interest:'Deposit interest',
+      cat_cashback:'Cashback', cat_investment:'Investments', cat_sale:'Selling items',
+      cat_returns:'Debt repayment', cat_credit_payment:'Credit payment', cat_other_income:'Other',
+      // Subcategories
+      sub_savings_home:'Housing', sub_savings_reserve:'Reserve', sub_savings_education:'Education',
+      sub_savings_car:'Car', sub_savings_rest:'Vacation', sub_savings_renovation:'Renovation',
+      sub_savings_other:'Other', sub_obligation_loan:'Loan', sub_obligation_debt:'Debt',
+      sub_obligation_lease:'Leasing/installment',
+      // Account types
+      type_debit:'Debit · Personal', type_debit_fop:'Debit · Business',
+      type_credit:'Credit · Personal', type_credit_fop:'Credit · Business',
+      type_cashback:'Cashback', type_savings_jar:'Savings jar', type_other:'Other',
+      // Accounts page
+      cash_section:'CASH', banks_section:'BANKS', crypto_section:'CRYPTOCURRENCY',
+      savings_section:'SAVINGS', debts_section:'DEBT TRACKER', credit_tracker_section:'CREDIT CARDS — TRACKER',
+      owed_me_section:'Owed to me', owed_by_section:'I owe',
+      btn_repay:'+ Repay credit', repay_source_ph:'— Source of funds —',
+      terminal_label:'🏧 ATM / terminal', other_label:'💸 Other',
+      fully_repaid:'✓ Fully repaid', balance_label:'✓ Credit balance',
+      used_label:'Used', own_funds_txt:'💳 Own funds:',
+      debt_remaining_label:'remaining', closed_label:'Closed:',
+      add_debt_btn:'+ Add debt to tracker', add_new_debt_btn:'+ New debt',
+      who_owes:'Who owes me', whom_i_owe:'Whom I owe',
+      debt_amount_label:'Debt amount', debt_desc_label:'Description (optional)',
+      save_btn:'Save', cancel_btn:'Cancel', edit_btn:'Edit', delete_btn:'Delete',
+      done_btn:'Done', saving_label:'Saving…',
+      refresh_rates_btn:'Refresh rates',
+      // Stats labels
+      total_label:'Total', own_funds_title:'Own funds', credit_cards_title:'CREDIT CARDS',
+      debt_label:'debt', remainder_label:'remainder',
+      period_label_monthly:'Monthly spending limit', change_btn:'Change', remaining_label:'Remaining',
     }
   };
   function t(key) { return (TRANSLATIONS[currentLang] || TRANSLATIONS.uk)[key] || key; }
+  function catName(id, isSub) {
+    if (currentLang === 'uk') return null; // використовуємо оригінальну назву
+    const key = (isSub ? 'sub_' : 'cat_') + id;
+    const tr = TRANSLATIONS.en[key];
+    return tr || null;
+  }
   function setLang(lang) {
     currentLang = lang;
     localStorage.setItem('lang', lang);
@@ -1553,13 +1635,17 @@
   }
 
   function allCats() { return [...CATEGORIES.expense, ...CATEGORIES.income]; }
-  function catInfo(id) { return allCats().find(c => c.id === id) || {name:id, em:'•'}; }
+  function catInfo(id) {
+    const c = allCats().find(c => c.id === id) || {name:id, em:'•'};
+    return { ...c, name: catName(c.id) || c.name };
+  }
   function subcatName(catId, subcatId) {
     if (!subcatId) return null;
     const cat = allCats().find(c => c.id === catId);
     if (!cat || !cat.subcats) return null;
     const sc = cat.subcats.find(s => s.id === subcatId);
-    return sc ? sc.name : null;
+    if (!sc) return null;
+    return catName(sc.id, true) || sc.name;
   }
   function fmt(n) { return Number(n).toLocaleString('uk-UA', {minimumFractionDigits:2, maximumFractionDigits:2}); }
 
@@ -1930,7 +2016,7 @@
       }
       if (CAT_HIGHLIGHT[c.id]) btn.className += ' ' + CAT_HIGHLIGHT[c.id];
       btn.dataset.cat = c.id;
-      btn.innerHTML = '<span class="em">' + c.em + '</span><span>' + c.name + '</span>';
+      btn.innerHTML = '<span class="em">' + c.em + '</span><span>' + (catName(c.id) || c.name) + '</span>';
       btn.addEventListener('click', () => {
         grid.querySelectorAll('.cat-pick').forEach(b => b.classList.remove('active'));
         btn.classList.add('active');
@@ -1958,7 +2044,7 @@
       const btn = document.createElement('button');
       btn.className = 'cat-pick' + (i === 0 ? ' active' : '');
       btn.dataset.subcat = sc.id;
-      btn.innerHTML = '<span>' + sc.name + '</span>';
+      btn.innerHTML = '<span>' + (catName(sc.id, true) || sc.name) + '</span>';
       btn.addEventListener('click', () => {
         grid.querySelectorAll('.cat-pick').forEach(b => b.classList.remove('active'));
         btn.classList.add('active');
@@ -2055,7 +2141,7 @@
     wrap.innerHTML = '<div class="budget-limit-card">' +
       '<div class="top-row">' +
         '<span class="title">Місячний ліміт витрат</span>' +
-        '<button class="edit-link" id="budget-limit-edit">Змінити</button>' +
+        '<button class="edit-link" id="budget-limit-edit">' + t('change_btn') + '</button>' +
       '</div>' +
       '<div class="amounts">' +
         '<span class="spent" style="color:' + (over ? 'var(--danger)' : 'var(--text-primary)') + '">' + SYMS[state.budgetLimitCurrency] + fmt(spent) + '</span>' +
@@ -2065,7 +2151,7 @@
       '<div class="remaining">' +
         (over
           ? 'Перевищено на ' + SYMS[state.budgetLimitCurrency] + fmt(Math.abs(remaining))
-          : 'Залишилось ' + SYMS[state.budgetLimitCurrency] + fmt(remaining)) +
+          : t('remaining_label') + ' ' + SYMS[state.budgetLimitCurrency] + fmt(remaining)) +
         (hasUnconverted ? ' · деякі суми не вдалось конвертувати' : '') +
       '</div>' +
     '</div>';
@@ -2195,7 +2281,7 @@
         if (sum === 0) return;
         const pct = total > 0 ? Math.round((sum/total)*100) : 0;
         html += '<div class="cat-row">' +
-          '<div class="top"><span class="name">' + cat.em + ' ' + cat.name + '</span><span class="amt">' + SYMS[cur] + fmt(sum) + ' · ' + pct + '%</span></div>' +
+          '<div class="top"><span class="name">' + cat.em + ' ' + (catName(cat.id) || cat.name) + '</span><span class="amt">' + SYMS[cur] + fmt(sum) + ' · ' + pct + '%</span></div>' +
           '<div class="bar-track"><div class="bar-fill" style="width:' + pct + '%"></div></div>' +
         '</div>';
       });
@@ -2216,7 +2302,7 @@
           if (sum === 0) return;
           const pct = total > 0 ? Math.round((sum/total)*100) : 0;
           html += '<div class="cat-row">' +
-            '<div class="top"><span class="name">' + cat.em + ' ' + cat.name + '</span><span class="amt" style="color:var(--success);">' + SYMS[cur] + fmt(sum) + ' · ' + pct + '%</span></div>' +
+            '<div class="top"><span class="name">' + cat.em + ' ' + (catName(cat.id) || cat.name) + '</span><span class="amt" style="color:var(--success);">' + SYMS[cur] + fmt(sum) + ' · ' + pct + '%</span></div>' +
             '<div class="bar-track"><div class="bar-fill" style="width:' + pct + '%;background:var(--success);"></div></div>' +
           '</div>';
         });
@@ -2237,9 +2323,9 @@
   function renderFilterChips() {
     const wrap = document.getElementById('tx-filter-chips');
     const chips = [
-      {id:'all', label:'Усі'},
-      {id:'expense', label:'Витрати'},
-      {id:'income', label:'Доходи'}
+      {id:'all', label:t('filter_all')},
+      {id:'expense', label:t('filter_expenses')},
+      {id:'income', label:t('filter_income')}
     ];
     wrap.innerHTML = chips.map(c =>
       '<button class="filter-chip' + (listFilter.type === c.id ? ' active' : '') + '" data-filter="' + c.id + '">' + c.label + '</button>'
@@ -2279,8 +2365,8 @@
       listEl.innerHTML = '';
       emptyEl.style.display = 'block';
       emptyEl.innerHTML = state.transactions.length === 0
-        ? 'Поки що немає записів.<br>Додай перший у вкладці "Додати".'
-        : 'Нічого не знайдено за цим фільтром.';
+        ? currentLang === 'uk' ? 'Поки що немає записів.<br>Додай перший у вкладці "Додати".' : 'No records yet.<br>Add your first one in the "Add" tab.'
+        : currentLang === 'uk' ? 'Нічого не знайдено за цим фільтром.' : 'Nothing found for this filter.';
       return;
     }
     emptyEl.style.display = 'none';
@@ -2297,7 +2383,7 @@
       const direction = tx.category === 'returns' ? 'to_me' : 'by_me';
       const availableDebts = canLink ? state.debts.filter(d => d.direction === direction && !d.is_closed && d.currency === tx.currency) : [];
       const linkBtn = availableDebts.length
-        ? '<button class="edit-bank-btn" style="font-size:11px;padding:3px 8px;color:var(--accent);border-color:var(--accent);" data-link-tx="' + tx.id + '" data-link-dir="' + direction + '">Прив\'язати до боргу</button>'
+        ? '<button class="edit-bank-btn" style="font-size:11px;padding:3px 8px;color:var(--accent);border-color:var(--accent);" data-link-tx="' + tx.id + '" data-link-dir="' + direction + '">' + t('link_to_debt') + '</button>'
         : '';
 
       return '<div class="tx-item" style="flex-direction:column;align-items:stretch;">' +
@@ -2666,8 +2752,8 @@
     }
 
     wrap.innerHTML = addFormHtml +
-      sectionHtml('to_me', 'Винні мені', 'owed-to-me') +
-      sectionHtml('by_me', 'Я винен', 'owed-by-me');
+      sectionHtml('to_me', t('owed_me_section'), 'owed-to-me') +
+      sectionHtml('by_me', t('owed_by_section'), 'owed-by-me');
 
     // Додати новий борг
     ['to_me', 'by_me'].forEach(dir => {
@@ -2912,14 +2998,14 @@
             (limit ? '<div style="font-size:11px;color:rgba(255,255,255,0.65);">ліміт ' + fmtAmount(acc.currency, limit) + '</div>' : '') +
           '</div>' +
         '</div>' +
-        (ownFunds > 0 ? '<div style="font-size:12px;color:rgba(255,255,255,0.75);margin-bottom:6px;">💳 Власні кошти: ' + fmtAmount(acc.currency, ownFunds) + ' · Всього доступно: ' + fmtAmount(acc.currency, available) + '</div>' : '') +
+        (ownFunds > 0 ? '<div style="font-size:12px;color:rgba(255,255,255,0.75);margin-bottom:6px;">' + t('own_funds_txt') + ' ' + fmtAmount(acc.currency, ownFunds) + ' · ' + t('available') + ' ' + fmtAmount(acc.currency, available) + '</div>' : '') +
         (limit ? (
           '<div style="height:4px;background:rgba(255,255,255,0.15);border-radius:2px;margin-bottom:6px;">' +
             '<div style="height:100%;width:' + Math.min(100,Math.max(0,pct)) + '%;background:' + (hasCredit ? 'rgba(100,255,150,0.8)' : isFullyPaid ? 'rgba(100,255,150,0.8)' : pct > 80 ? '#ff8080' : 'rgba(255,255,255,0.7)') + ';border-radius:2px;"></div>' +
           '</div>' +
           '<div style="display:flex;justify-content:space-between;font-size:11.5px;color:rgba(255,255,255,0.7);margin-bottom:10px;">' +
-            '<span>' + (hasCredit ? '✓ Залишок на картці' : isFullyPaid ? '✓ Повністю погашено' : 'Використано ' + pct + '%') + '</span>' +
-            (!ownFunds ? '<span>Доступно: ' + fmtAmount(acc.currency, available) + '</span>' : '') +
+            '<span>' + (hasCredit ? t('balance_label') : isFullyPaid ? t('fully_repaid') : t('used_label') + ' ' + pct + '%') + '</span>' +
+            (!ownFunds ? '<span>' + t('available') + ' ' + fmtAmount(acc.currency, available) + '</span>' : '') +
           '</div>'
         ) : '') +
         (txRows ? '<div style="margin-bottom:8px;">' + txRows + '</div>' : '') +
@@ -3300,7 +3386,7 @@
         if (limit) {
           row += '<div style="font-size:11px;color:rgba(255,255,255,0.6);display:flex;justify-content:space-between;margin-bottom:3px;">' +
             '<span>' + (hasRemainder ? '✓ Залишок' : 'Борг ' + pct + '%') + '</span>' +
-            '<span>Доступно: ' + fmtAmount(acc.currency, available) + '</span>' +
+            '<span>' + t('available') + ' ' + fmtAmount(acc.currency, available) + '</span>' +
           '</div>' +
           '<div style="height:3px;background:rgba(255,255,255,0.15);border-radius:2px;">' +
             '<div style="height:100%;width:' + pct + '%;background:' + (hasRemainder ? 'rgba(100,255,150,0.7)' : pct > 80 ? '#ff6b6b' : 'rgba(255,255,255,0.6)') + ';border-radius:2px;"></div>' +
@@ -3324,7 +3410,7 @@
 
     const hasCreditAccs = state.accounts.some(a => CREDIT_TYPES.includes(a.type));
     const creditSection = hasCreditAccs ? '<div style="margin-top:12px;padding-top:12px;border-top:0.5px solid rgba(255,255,255,0.2);">' +
-      '<div style="font-size:11px;color:rgba(255,255,255,0.6);margin-bottom:4px;">КРЕДИТНІ КАРТКИ</div>' +
+      '<div style="font-size:11px;color:rgba(255,255,255,0.6);margin-bottom:4px;">' + t('credit_cards_title') + '</div>' +
       '<div style="font-size:20px;font-weight:700;color:' + (creditTotal >= 0 ? 'rgba(100,255,150,0.95)' : 'rgba(255,255,255,0.9)') + ';">' +
         creditSign + SYMS[targetCur] + fmt(Math.abs(creditTotal)) +
         (creditTotal >= 0 ? ' залишок' : ' борг') +
@@ -3333,7 +3419,7 @@
     '</div>' : '';
 
     card.innerHTML = '<div class="accounts-total-card">' +
-      '<div class="label">Власні кошти ' + currencySelector + '</div>' +
+      '<div class="label">' + t('own_funds_title') + ' ' + currencySelector + '</div>' +
       '<div class="value">' + SYMS[targetCur] + fmt(total) + '</div>' +
       (breakdown ? '<div class="breakdown">' + breakdown + '</div>' : '') +
       (rowsHtml.length ? '<div class="bank-rows">' + rowsHtml.join('') + '</div>' : '') +
@@ -3376,13 +3462,13 @@
     document.getElementById('period-next').disabled = state.periodOffset >= 0;
   });
   const ACCOUNT_TYPE_LABELS = {
-    debit: 'Дебітова · Особистий',
-    debit_fop: 'Дебітова · ФОП',
-    credit: 'Кредитна · Особистий',
-    credit_fop: 'Кредитна · ФОП',
-    cashback: 'Кешбек',
-    savings_jar: 'Копілка',
-    other: 'Інший'
+    debit: t('type_debit'),
+    debit_fop: t('type_debit_fop'),
+    credit: t('type_credit'),
+    credit_fop: t('type_credit_fop'),
+    cashback: t('type_cashback'),
+    savings_jar: t('type_savings_jar'),
+    other: t('type_other')
   };
 
   function populateAccountSelect() {
