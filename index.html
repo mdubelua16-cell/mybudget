@@ -1269,6 +1269,12 @@
       total_label:'Загалом', own_funds_title:'Власні кошти', credit_cards_title:'КРЕДИТНІ КАРТКИ',
       debt_label:'борг', remainder_label:'залишок',
       period_label_monthly:'Місячний ліміт витрат', change_btn:'Змінити', remaining_label:'Залишилось',
+      budget_limit_hint:'Встанови ліміт, щоб бачити прогрес витрат за місяць.',
+      budget_limit_ph:'Наприклад, 1000', set_btn:'Встановити',
+      of_label:'з', over_by_label:'Перевищено на', unconverted_note:'деякі суми не вдалось конвертувати',
+      rate_unavailable:'Курс недоступний — перевір інтернет', updated_label:'оновлено',
+      limit_label:'ліміт',
+      name_label:'Ім\'я', amount_short:'Сума', reason_ph:'За що',
     },
     en: {
       // Auth
@@ -1372,9 +1378,16 @@
       total_label:'Total', own_funds_title:'Own funds', credit_cards_title:'CREDIT CARDS',
       debt_label:'debt', remainder_label:'remainder',
       period_label_monthly:'Monthly spending limit', change_btn:'Change', remaining_label:'Remaining',
+      budget_limit_hint:'Set a limit to track your monthly spending progress.',
+      budget_limit_ph:'E.g. 1000', set_btn:'Set',
+      of_label:'of', over_by_label:'Over by', unconverted_note:'some amounts could not be converted',
+      rate_unavailable:'Rate unavailable — check your internet connection', updated_label:'updated',
+      limit_label:'limit',
+      name_label:'Name', amount_short:'Amount', reason_ph:'What for',
     }
   };
   function t(key) { return (TRANSLATIONS[currentLang] || TRANSLATIONS.uk)[key] || key; }
+  function dateLocale() { return currentLang === 'uk' ? 'uk-UA' : 'en-GB'; }
   function catName(id, isSub) {
     if (currentLang === 'uk') return null; // використовуємо оригінальну назву
     const key = (isSub ? 'sub_' : 'cat_') + id;
@@ -1481,14 +1494,14 @@
   function bankName(id) { const b = allBanks().find(b => b.id === id); return b ? b.name : id; }
   function accountDisplayName(accId) {
     // Legacy values
-    if (accId === 'cash') return '💵 Готівка';
-    if (accId === 'crypto') return '🪙 Крипто';
-    if (accId === 'bank') return 'Банк';
+    if (accId === 'cash') return '💵 ' + t('cash');
+    if (accId === 'crypto') return '🪙 ' + t('crypto');
+    if (accId === 'bank') return t('banks');
     // New: uuid of named account
     const acc = state.accounts.find(a => a.id === accId);
     if (acc) {
-      const bankLabel = acc.bankId === 'cash' ? 'Готівка' :
-                        acc.bankId === 'crypto' ? 'Крипто' :
+      const bankLabel = acc.bankId === 'cash' ? t('cash') :
+                        acc.bankId === 'crypto' ? t('crypto') :
                         bankName(acc.bankId);
       return acc.name !== 'Основний' ? bankLabel + ' · ' + acc.name : bankLabel;
     }
@@ -1963,12 +1976,12 @@
 
   function periodLabel(period) {
     const ref = refDate();
-    if (period === 'day') return ref.toLocaleDateString('uk-UA', {day:'numeric', month:'long', year:'numeric'});
+    if (period === 'day') return ref.toLocaleDateString(dateLocale(), {day:'numeric', month:'long', year:'numeric'});
     if (period === 'week') {
       const s = startOfPeriod('week', ref), e = new Date(endOfPeriod('week', ref)); e.setDate(e.getDate()-1);
-      return s.toLocaleDateString('uk-UA',{day:'numeric',month:'short'}) + ' — ' + e.toLocaleDateString('uk-UA',{day:'numeric',month:'short'});
+      return s.toLocaleDateString(dateLocale(),{day:'numeric',month:'short'}) + ' — ' + e.toLocaleDateString(dateLocale(),{day:'numeric',month:'short'});
     }
-    if (period === 'month') return ref.toLocaleDateString('uk-UA', {month:'long', year:'numeric'});
+    if (period === 'month') return ref.toLocaleDateString(dateLocale(), {month:'long', year:'numeric'});
     if (period === 'year') return ref.getFullYear().toString();
   }
   function txInPeriod(tx, period) {
@@ -2077,7 +2090,7 @@
         relevantDebts.map(d => {
           const remaining = debtBalance(d);
           return '<option value="' + d.id + '">' + escapeHtml(d.person_name) +
-            ' (' + SYMS[d.currency] + fmt(remaining) + ' залишок)</option>';
+            ' (' + SYMS[d.currency] + fmt(remaining) + ' ' + t('debt_remaining') + ')</option>';
         }).join('') +
       '</select>';
   }
@@ -2097,12 +2110,12 @@
 
     if (state.budgetLimit === null || state.budgetLimit === undefined) {
       wrap.innerHTML = '<div class="budget-limit-card">' +
-        '<div class="title">Місячний ліміт витрат</div>' +
-        '<p style="font-size:13px; color:var(--text-secondary); margin:8px 0 10px;">Встанови ліміт, щоб бачити прогрес витрат за місяць.</p>' +
+        '<div class="title">' + t('monthly_limit') + '</div>' +
+        '<p style="font-size:13px; color:var(--text-secondary); margin:8px 0 10px;">' + t('budget_limit_hint') + '</p>' +
         '<div class="budget-setup-row">' +
-          '<input type="text" inputmode="decimal" id="budget-limit-input" placeholder="Наприклад, 1000">' +
+          '<input type="text" inputmode="decimal" id="budget-limit-input" placeholder="' + t('budget_limit_ph') + '">' +
           '<select id="budget-limit-currency">' + CURRENCIES.map(c => '<option value="' + c + '">' + c + '</option>').join('') + '</select>' +
-          '<button id="budget-limit-save">Встановити</button>' +
+          '<button id="budget-limit-save">' + t('set_btn') + '</button>' +
         '</div>' +
       '</div>';
       document.getElementById('budget-limit-input').addEventListener('input', sanitizeAmountInput);
@@ -2140,19 +2153,19 @@
 
     wrap.innerHTML = '<div class="budget-limit-card">' +
       '<div class="top-row">' +
-        '<span class="title">Місячний ліміт витрат</span>' +
+        '<span class="title">' + t('monthly_limit') + '</span>' +
         '<button class="edit-link" id="budget-limit-edit">' + t('change_btn') + '</button>' +
       '</div>' +
       '<div class="amounts">' +
         '<span class="spent" style="color:' + (over ? 'var(--danger)' : 'var(--text-primary)') + '">' + SYMS[state.budgetLimitCurrency] + fmt(spent) + '</span>' +
-        '<span class="limit">з ' + SYMS[state.budgetLimitCurrency] + fmt(state.budgetLimit) + '</span>' +
+        '<span class="limit">' + t('of_label') + ' ' + SYMS[state.budgetLimitCurrency] + fmt(state.budgetLimit) + '</span>' +
       '</div>' +
       '<div class="budget-progress-track"><div class="budget-progress-fill" style="width:' + pct + '%; background:' + barColor + ';"></div></div>' +
       '<div class="remaining">' +
         (over
-          ? 'Перевищено на ' + SYMS[state.budgetLimitCurrency] + fmt(Math.abs(remaining))
+          ? t('over_by_label') + ' ' + SYMS[state.budgetLimitCurrency] + fmt(Math.abs(remaining))
           : t('remaining_label') + ' ' + SYMS[state.budgetLimitCurrency] + fmt(remaining)) +
-        (hasUnconverted ? ' · деякі суми не вдалось конвертувати' : '') +
+        (hasUnconverted ? ' · ' + t('unconverted_note') : '') +
       '</div>' +
     '</div>';
 
@@ -2184,11 +2197,11 @@
 
     wrap.innerHTML = '<div class="owed-stats-grid">' +
       '<div class="owed-card owed-to-me">' +
-        '<div class="label">Винні мені</div>' +
+        '<div class="label">' + t('owed_me_card') + '</div>' +
         '<div class="value">' + (toMeParts.length ? toMeParts.join(' · ') : '—') + '</div>' +
       '</div>' +
       '<div class="owed-card owed-by-me">' +
-        '<div class="label">Я винен</div>' +
+        '<div class="label">' + t('owed_by_card') + '</div>' +
         '<div class="value">' + (byMeParts.length ? byMeParts.join(' · ') : '—') + '</div>' +
       '</div>' +
     '</div>';
@@ -2214,14 +2227,14 @@
     '</select>';
 
     if (!hasRates) {
-      card.innerHTML = '<div class="label">Загалом ' + currencySelector + ' <button class="refresh-rate-btn" id="refresh-rate">Оновити курс</button></div>' +
-        '<div class="value" style="color:var(--text-muted); font-size:15px;">Курс недоступний — перевір інтернет</div>';
+      card.innerHTML = '<div class="label">' + t('total_label') + ' ' + currencySelector + ' <button class="refresh-rate-btn" id="refresh-rate">' + t('refresh_rates_btn') + '</button></div>' +
+        '<div class="value" style="color:var(--text-muted); font-size:15px;">' + t('rate_unavailable') + '</div>';
     } else {
       const color = total >= 0 ? 'var(--success)' : 'var(--danger)';
-      const updated = rates.fetchedAt ? new Date(rates.fetchedAt).toLocaleString('uk-UA', {day:'numeric', month:'short', hour:'2-digit', minute:'2-digit'}) : '';
-      card.innerHTML = '<div class="label">Загалом ' + currencySelector + ' <button class="refresh-rate-btn" id="refresh-rate">Оновити курс</button></div>' +
+      const updated = rates.fetchedAt ? new Date(rates.fetchedAt).toLocaleString(dateLocale(), {day:'numeric', month:'short', hour:'2-digit', minute:'2-digit'}) : '';
+      card.innerHTML = '<div class="label">' + t('total_label') + ' ' + currencySelector + ' <button class="refresh-rate-btn" id="refresh-rate">' + t('refresh_rates_btn') + '</button></div>' +
         '<div class="value" style="color:' + color + '">' + (total>=0?'+':'') + SYMS[targetCur] + fmt(total) + '</div>' +
-        '<div class="rate-info">1 EUR ≈ ' + fmt(rates.EUR) + ' ₴ · 1 USD ≈ ' + fmt(rates.USD) + ' ₴' + (rates.PLN ? ' · 1 PLN ≈ ' + fmt(rates.PLN) + ' ₴' : '') + ' · оновлено ' + updated + '</div>';
+        '<div class="rate-info">1 EUR ≈ ' + fmt(rates.EUR) + ' ₴ · 1 USD ≈ ' + fmt(rates.USD) + ' ₴' + (rates.PLN ? ' · 1 PLN ≈ ' + fmt(rates.PLN) + ' ₴' : '') + ' · ' + t('updated_label') + ' ' + updated + '</div>';
     }
 
     const selectEl = document.getElementById('stats-currency-select');
@@ -2375,7 +2388,7 @@
       const scName = subcatName(tx.category, tx.subcategory);
       const displayName = scName ? info.name + ' · ' + scName : info.name;
       const isIncome = tx.type === 'income';
-      const dateStr = new Date(tx.date + 'T00:00:00').toLocaleDateString('uk-UA', {day:'numeric', month:'short'});
+      const dateStr = new Date(tx.date + 'T00:00:00').toLocaleDateString(dateLocale(), {day:'numeric', month:'short'});
       const accLabel = accountDisplayName(tx.account);
 
       // Кнопка прив'язки до боргу для транзакцій "Повернули борг" без debt_id
@@ -2426,7 +2439,7 @@
 
         // Кілька боргів — показуємо вибір
         const debtOptions = availableDebts.map(d =>
-          '<option value="' + d.id + '">' + escapeHtml(d.person_name) + ' (' + SYMS[d.currency] + fmt(debtBalance(d)) + ' залишок)</option>'
+          '<option value="' + d.id + '">' + escapeHtml(d.person_name) + ' (' + SYMS[d.currency] + fmt(debtBalance(d)) + ' ' + t('debt_remaining') + ')</option>'
         ).join('');
         const wrap = btn.parentElement;
         wrap.innerHTML = '<select id="link-debt-select" style="flex:1;font-size:13px;">' + debtOptions + '</select>' +
@@ -2566,7 +2579,7 @@
     wrap.innerHTML = '<div class="bank-list-row">' +
       '<div class="left-info"><span class="name">' + icon + ' ' + label + '</span>' +
       '<span class="vals">' + (parts.length ? parts.join(' · ') : '—') + '</span></div>' +
-      '<button class="edit-bank-btn" id="' + bankId + '-edit-btn">Редагувати</button>' +
+      '<button class="edit-bank-btn" id="' + bankId + '-edit-btn">' + t('edit_btn') + '</button>' +
     '</div>';
 
     document.getElementById(bankId + '-edit-btn').addEventListener('click', () => {
@@ -2578,12 +2591,12 @@
 
   function renderCashBalance() {
     const wrap = document.getElementById('cash-balance-card');
-    renderSpecialAccountCard(wrap, 'cash', '💵', 'Готівка', 'cash-edit');
+    renderSpecialAccountCard(wrap, 'cash', '💵', t('cash'), 'cash-edit');
   }
 
   function renderCryptoBalance() {
     const wrap = document.getElementById('crypto-balance-card');
-    renderSpecialAccountCard(wrap, 'crypto', '🪙', 'Крипто', 'crypto-edit');
+    renderSpecialAccountCard(wrap, 'crypto', '🪙', t('crypto'), 'crypto-edit');
   }
 
   let savingsExpanded = false;
@@ -2615,7 +2628,7 @@
             '<span style="font-weight:600;">' + parts.join(' · ') + '</span>' +
           '</div>' +
           subTxs.slice(0, 5).map(t => {
-            const d = new Date(t.date + 'T00:00:00').toLocaleDateString('uk-UA', {day:'numeric', month:'short'});
+            const d = new Date(t.date + 'T00:00:00').toLocaleDateString(dateLocale(), {day:'numeric', month:'short'});
             return '<div style="display:flex;justify-content:space-between;font-size:11.5px;color:rgba(255,255,255,0.65);padding:2px 0 0 8px;">' +
               '<span>' + d + (t.note ? ' · ' + escapeHtml(t.note) : '') + '</span>' +
               '<span>' + fmtAmount(t.currency, t.amount) + '</span>' +
@@ -2632,7 +2645,7 @@
     }
 
     wrap.innerHTML = '<div class="owed-card savings-card" id="savings-card-inner" style="cursor:pointer;">' +
-      '<div class="label" style="justify-content:space-between;">Заощадження (всього) <span>' + (savingsExpanded ? '▲' : '▼') + '</span></div>' +
+      '<div class="label" style="justify-content:space-between;">' + t('savings_total') + ' <span>' + (savingsExpanded ? '▲' : '▼') + '</span></div>' +
       '<div class="value">' + (totalParts.length ? totalParts.join(' · ') : '—') + '</div>' +
       detailsHtml +
     '</div>';
@@ -2659,21 +2672,21 @@
 
       if (isEditing) {
         return '<div style="background:rgba(255,255,255,0.08);border-radius:10px;padding:12px;margin-top:8px;" data-debt-row="' + debt.id + '">' +
-          '<div class="auth-field" style="margin-bottom:8px;"><label style="color:rgba(255,255,255,0.75);">Ім\'я</label>' +
+          '<div class="auth-field" style="margin-bottom:8px;"><label style="color:rgba(255,255,255,0.75);">' + t('name_label') + '</label>' +
             '<input type="text" id="edit-person-' + debt.id + '" value="' + escapeHtml(debt.person_name) + '" style="background:rgba(255,255,255,0.15);border:0.5px solid rgba(255,255,255,0.3);border-radius:8px;padding:8px 12px;color:#fff;font-size:14px;width:100%;font-family:inherit;"></div>' +
           '<div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:8px;">' +
-            '<div><label style="font-size:12px;color:rgba(255,255,255,0.75);">Сума</label>' +
+            '<div><label style="font-size:12px;color:rgba(255,255,255,0.75);">' + t('amount_short') + '</label>' +
               '<input type="text" inputmode="decimal" id="edit-amount-' + debt.id + '" value="' + debt.original_amount + '" style="background:rgba(255,255,255,0.15);border:0.5px solid rgba(255,255,255,0.3);border-radius:8px;padding:8px 12px;color:#fff;font-size:14px;width:100%;font-family:inherit;"></div>' +
-            '<div><label style="font-size:12px;color:rgba(255,255,255,0.75);">Валюта</label>' +
+            '<div><label style="font-size:12px;color:rgba(255,255,255,0.75);">' + t('debt_currency') + '</label>' +
               '<select id="edit-currency-' + debt.id + '" style="background:rgba(255,255,255,0.15);border:0.5px solid rgba(255,255,255,0.3);border-radius:8px;padding:8px 12px;color:#fff;font-size:14px;width:100%;font-family:inherit;">' +
                 CURRENCIES.map(c => '<option value="' + c + '"' + (c === debt.currency ? ' selected' : '') + '>' + c + '</option>').join('') +
               '</select></div>' +
           '</div>' +
-          '<div class="auth-field" style="margin-bottom:10px;"><label style="color:rgba(255,255,255,0.75);">Опис (опційно)</label>' +
-            '<input type="text" id="edit-desc-' + debt.id + '" value="' + escapeHtml(debt.description || '') + '" placeholder="За що" style="background:rgba(255,255,255,0.15);border:0.5px solid rgba(255,255,255,0.3);border-radius:8px;padding:8px 12px;color:#fff;font-size:14px;width:100%;font-family:inherit;"></div>' +
+          '<div class="auth-field" style="margin-bottom:10px;"><label style="color:rgba(255,255,255,0.75);">' + t('debt_desc') + '</label>' +
+            '<input type="text" id="edit-desc-' + debt.id + '" value="' + escapeHtml(debt.description || '') + '" placeholder="' + t('reason_ph') + '" style="background:rgba(255,255,255,0.15);border:0.5px solid rgba(255,255,255,0.3);border-radius:8px;padding:8px 12px;color:#fff;font-size:14px;width:100%;font-family:inherit;"></div>' +
           '<div style="display:flex;gap:8px;">' +
-            '<button class="save-btn" style="flex:1;" data-edit-save="' + debt.id + '">Зберегти</button>' +
-            '<button class="edit-bank-btn" style="color:rgba(255,255,255,0.7);background:rgba(255,255,255,0.1);border-color:rgba(255,255,255,0.2);" data-edit-cancel>Скасувати</button>' +
+            '<button class="save-btn" style="flex:1;" data-edit-save="' + debt.id + '">' + t('save_btn') + '</button>' +
+            '<button class="edit-bank-btn" style="color:rgba(255,255,255,0.7);background:rgba(255,255,255,0.1);border-color:rgba(255,255,255,0.2);" data-edit-cancel>' + t('cancel_btn') + '</button>' +
           '</div>' +
         '</div>';
       }
@@ -2687,24 +2700,24 @@
           '</div>' +
           '<div style="text-align:right;margin-left:8px;">' +
             '<div style="font-size:13px;font-weight:700;color:' + (closed ? 'rgba(100,255,150,0.9)' : 'rgba(255,255,255,1)') + ';">' +
-              (closed ? '✓ Закрито' : SYMS[debt.currency] + fmt(remaining) + ' залишок') +
+              (closed ? '✓ ' + t('debt_paid') : SYMS[debt.currency] + fmt(remaining) + ' ' + t('debt_remaining')) +
             '</div>' +
-            '<div style="font-size:11px;color:rgba(255,255,255,0.6);">з ' + SYMS[debt.currency] + fmt(debt.original_amount) + '</div>' +
+            '<div style="font-size:11px;color:rgba(255,255,255,0.6);">' + t('of_label') + ' ' + SYMS[debt.currency] + fmt(debt.original_amount) + '</div>' +
           '</div>' +
         '</div>' +
         '<div style="height:4px;background:rgba(255,255,255,0.15);border-radius:2px;margin:8px 0 4px;">' +
           '<div style="height:100%;width:' + pct + '%;background:' + (closed ? 'rgba(100,255,150,0.8)' : 'rgba(255,255,255,0.7)') + ';border-radius:2px;transition:width 0.5s;"></div>' +
         '</div>' +
         (txs.length ? txs.map(t => {
-          const d = new Date(t.date + 'T00:00:00').toLocaleDateString('uk-UA', {day:'numeric', month:'short'});
+          const d = new Date(t.date + 'T00:00:00').toLocaleDateString(dateLocale(), {day:'numeric', month:'short'});
           return '<div style="display:flex;justify-content:space-between;font-size:11.5px;color:rgba(255,255,255,0.7);padding:2px 0;">' +
             '<span>' + d + (t.note ? ' · ' + escapeHtml(t.note) : '') + '</span>' +
             '<span>-' + SYMS[debt.currency] + fmt(t.amount) + '</span>' +
           '</div>';
         }).join('') : '') +
         '<div style="display:flex;gap:6px;margin-top:8px;">' +
-          (!closed ? '<button class="edit-bank-btn" style="flex:1;text-align:center;color:rgba(255,255,255,0.9);background:rgba(255,255,255,0.15);border-color:rgba(255,255,255,0.3);" data-pay-debt="' + debt.id + '">+ Повернення</button>' : '<span style="font-size:12px;color:rgba(255,255,255,0.5);line-height:32px;">✓ Закрито</span>') +
-          '<button class="edit-bank-btn" style="color:rgba(255,255,255,0.8);background:rgba(255,255,255,0.1);border-color:rgba(255,255,255,0.2);" data-edit-debt="' + debt.id + '">Редагувати</button>' +
+          (!closed ? '<button class="edit-bank-btn" style="flex:1;text-align:center;color:rgba(255,255,255,0.9);background:rgba(255,255,255,0.15);border-color:rgba(255,255,255,0.3);" data-pay-debt="' + debt.id + '">' + t('debt_payment') + '</button>' : '<span style="font-size:12px;color:rgba(255,255,255,0.5);line-height:32px;">✓ ' + t('debt_paid') + '</span>') +
+          '<button class="edit-bank-btn" style="color:rgba(255,255,255,0.8);background:rgba(255,255,255,0.1);border-color:rgba(255,255,255,0.2);" data-edit-debt="' + debt.id + '">' + t('edit_btn') + '</button>' +
           '<button class="edit-bank-btn" style="color:rgba(255,60,60,0.8);background:rgba(255,60,60,0.1);border-color:rgba(255,60,60,0.2);" data-delete-debt="' + debt.id + '">✕</button>' +
         '</div>' +
       '</div>';
@@ -2726,8 +2739,8 @@
         '<div class="label">' + label + '</div>' +
         '<div class="value">' + (parts.length ? parts.join(' · ') : '—') + '</div>' +
         debts.map(debtRow).join('') +
-        (closedDebts.length ? '<div style="font-size:11.5px;color:rgba(255,255,255,0.5);margin-top:8px;">Закриті: ' + closedDebts.map(d => escapeHtml(d.person_name)).join(', ') + '</div>' : '') +
-        '<button class="edit-bank-btn" style="width:100%;text-align:center;margin-top:10px;color:rgba(255,255,255,0.9);background:rgba(255,255,255,0.15);border-color:rgba(255,255,255,0.3);" id="add-debt-' + direction + '">+ Додати борг до трекера</button>' +
+        (closedDebts.length ? '<div style="font-size:11.5px;color:rgba(255,255,255,0.5);margin-top:8px;">' + t('debt_closed') + ' ' + closedDebts.map(d => escapeHtml(d.person_name)).join(', ') + '</div>' : '') +
+        '<button class="edit-bank-btn" style="width:100%;text-align:center;margin-top:10px;color:rgba(255,255,255,0.9);background:rgba(255,255,255,0.15);border-color:rgba(255,255,255,0.3);" id="add-debt-' + direction + '">' + t('add_debt') + '</button>' +
       '</div>';
     }
 
@@ -2940,7 +2953,7 @@
         .slice(0, 8);
 
       const txRows = accTxs.map(t => {
-        const d = new Date(t.date + 'T00:00:00').toLocaleDateString('uk-UA', {day:'numeric', month:'short'});
+        const d = new Date(t.date + 'T00:00:00').toLocaleDateString(dateLocale(), {day:'numeric', month:'short'});
         const cat = t.type === 'expense'
           ? CATEGORIES.expense.find(c => c.id === t.category)
           : CATEGORIES.income.find(c => c.id === t.category);
@@ -2967,7 +2980,7 @@
         '<option value="__terminal__">🏧 Термінал / банкомат</option>' +
         '<option value="__other__">💸 Інше</option>' +
         state.accounts.filter(a => a.id !== acc.id && a.balance > 0).map(a => {
-          const bName = a.bankId === 'cash' ? '💵 Готівка' : a.bankId === 'crypto' ? '🪙 Крипто' : bankName(a.bankId);
+          const bName = a.bankId === 'cash' ? '💵 ' + t('cash') : a.bankId === 'crypto' ? '🪙 ' + t('crypto') : bankName(a.bankId);
           const label = a.name !== 'Основний' ? bName + ' · ' + a.name : bName;
           return '<option value="' + a.id + '">' + label + ' (' + fmtAmount(a.currency, a.balance) + ')</option>';
         }).join('');
@@ -2992,10 +3005,10 @@
           '<div style="text-align:right;">' +
             '<div style="font-size:15px;font-weight:700;">' +
               (hasCredit
-                ? '+' + fmtAmount(acc.currency, displayUsed) + ' залишок'
+                ? '+' + fmtAmount(acc.currency, displayUsed) + ' ' + t('remainder_label')
                 : fmtAmount(acc.currency, displayUsed) + (isFullyPaid ? ' ✓' : ' борг')) +
             '</div>' +
-            (limit ? '<div style="font-size:11px;color:rgba(255,255,255,0.65);">ліміт ' + fmtAmount(acc.currency, limit) + '</div>' : '') +
+            (limit ? '<div style="font-size:11px;color:rgba(255,255,255,0.65);">' + t('limit_label') + ' ' + fmtAmount(acc.currency, limit) + '</div>' : '') +
           '</div>' +
         '</div>' +
         (ownFunds > 0 ? '<div style="font-size:12px;color:rgba(255,255,255,0.75);margin-bottom:6px;">' + t('own_funds_txt') + ' ' + fmtAmount(acc.currency, ownFunds) + ' · ' + t('available') + ' ' + fmtAmount(acc.currency, available) + '</div>' : '') +
@@ -3010,7 +3023,7 @@
         ) : '') +
         (txRows ? '<div style="margin-bottom:8px;">' + txRows + '</div>' : '') +
         (!creditPayForms[acc.id] ?
-          '<button class="edit-bank-btn" style="width:100%;text-align:center;color:rgba(255,255,255,0.9);background:rgba(255,255,255,0.15);border-color:rgba(255,255,255,0.3);" id="cpay-open-' + acc.id + '">+ Погасити кредит</button>'
+          '<button class="edit-bank-btn" style="width:100%;text-align:center;color:rgba(255,255,255,0.9);background:rgba(255,255,255,0.15);border-color:rgba(255,255,255,0.3);" id="cpay-open-' + acc.id + '">' + t('repay') + '</button>'
           : payForm) +
       '</div>';
     }).join('');
@@ -3087,7 +3100,7 @@
         return '<div class="bank-list-row" style="flex-direction:column;align-items:stretch;">' +
           '<div style="display:flex;justify-content:space-between;align-items:center;">' +
             '<span class="name">' + bank.name + '</span>' +
-            '<button class="edit-bank-btn" data-bank-edit="' + bank.id + '">Редагувати</button>' +
+            '<button class="edit-bank-btn" data-bank-edit="' + bank.id + '">' + t('edit_btn') + '</button>' +
           '</div>' +
           (subRows ? '<div style="margin-top:4px;">' + subRows + '</div>' : '') +
         '</div>';
@@ -3095,7 +3108,7 @@
     }
     html += '<button class="add-account-btn" id="add-account-btn">' +
       '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 5v14M5 12h14" stroke-linecap="round"/></svg>' +
-      'Додати рахунок' +
+      t('btn_add_account') +
     '</button>';
 
     wrap.innerHTML = html;
@@ -3192,32 +3205,32 @@
                 '<span style="font-size:14px; font-variant-numeric:tabular-nums;">' + SYMS[acc.currency] + fmt(acc.balance) + (acc.creditLimit ? ' / ' + fmt(acc.creditLimit) : '') + '</span>' +
               '</div>' +
               '<div class="bank-balances" style="grid-template-columns:1fr 1fr; gap:6px; margin-top:8px;">' +
-                '<input type="text" inputmode="decimal" placeholder="Баланс" value="' + (acc.balance || '') + '" data-acc-id="' + acc.id + '" data-acc-balance>' +
+                '<input type="text" inputmode="decimal" placeholder="' + t('balance_ph') + '" value="' + (acc.balance || '') + '" data-acc-id="' + acc.id + '" data-acc-balance>' +
                 (ACCOUNT_TYPE_LABELS[acc.type] && acc.type.includes('credit') ?
-                  '<input type="text" inputmode="decimal" placeholder="Кредитний ліміт" value="' + (acc.creditLimit || '') + '" data-acc-id="' + acc.id + '" data-acc-limit>' : '') +
-                '<button class="edit-bank-btn del-acc-btn" style="background:var(--danger-bg);color:var(--danger);border-color:var(--danger);" data-del-id="' + acc.id + '">Видалити</button>' +
+                  '<input type="text" inputmode="decimal" placeholder="' + t('credit_limit_ph') + '" value="' + (acc.creditLimit || '') + '" data-acc-id="' + acc.id + '" data-acc-limit>' : '') +
+                '<button class="edit-bank-btn del-acc-btn" style="background:var(--danger-bg);color:var(--danger);border-color:var(--danger);" data-del-id="' + acc.id + '">' + t('btn_delete') + '</button>' +
               '</div>' +
             '</div>';
           }).join('')
-        : '<p style="color:var(--text-muted);font-size:13px;margin:0 0 12px;">Ще немає рахунків для цього банку.</p>';
+        : '<p style="color:var(--text-muted);font-size:13px;margin:0 0 12px;">' + (currentLang === 'uk' ? 'Ще немає рахунків для цього банку.' : 'No accounts for this bank yet.') + '</p>';
 
       wrap.innerHTML = '<button class="group-back-btn" id="flow-done">' +
-        '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M15 18l-6-6 6-6" stroke-linecap="round" stroke-linejoin="round"/></svg>Готово</button>' +
+        '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M15 18l-6-6 6-6" stroke-linecap="round" stroke-linejoin="round"/></svg>' + t('btn_done') + '</button>' +
         '<p class="bank-group-title" style="margin-top:4px;">' + bank.name + '</p>' +
         accountsHtml +
         '<div class="bank-card" style="border-style:dashed;">' +
-          '<p style="font-size:13px;font-weight:600;margin:0 0 10px;">+ Новий рахунок</p>' +
+          '<p style="font-size:13px;font-weight:600;margin:0 0 10px;">' + t('new_account') + '</p>' +
           '<div style="display:flex;flex-direction:column;gap:8px;">' +
-            '<input type="text" id="new-acc-name" placeholder="Назва (напр. Біла картка)">' +
+            '<input type="text" id="new-acc-name" placeholder="' + t('acc_name_ph') + '">' +
             '<div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;">' +
               '<select id="new-acc-type">' +
                 Object.entries(ACCOUNT_TYPE_LABELS).map(([v,l]) => '<option value="' + v + '">' + l + '</option>').join('') +
               '</select>' +
               '<select id="new-acc-currency">' + CURRENCIES.map(c => '<option value="' + c + '">' + c + '</option>').join('') + '</select>' +
             '</div>' +
-            '<input type="text" inputmode="decimal" id="new-acc-balance" placeholder="Поточний баланс (0)">' +
-            '<input type="text" inputmode="decimal" id="new-acc-limit" placeholder="Кредитний ліміт (тільки для кредитних карток)" style="display:none;">' +
-            '<button class="save-btn" style="margin-top:4px;" id="new-acc-save">Додати рахунок</button>' +
+            '<input type="text" inputmode="decimal" id="new-acc-balance" placeholder="' + t('balance_ph') + '">' +
+            '<input type="text" inputmode="decimal" id="new-acc-limit" placeholder="' + t('credit_limit_ph') + '" style="display:none;">' +
+            '<button class="save-btn" style="margin-top:4px;" id="new-acc-save">' + t('btn_add_account') + '</button>' +
           '</div>' +
         '</div>';
 
@@ -3337,7 +3350,7 @@
     const cashAccs = state.accounts.filter(a => a.bankId === 'cash' && a.balance && !CREDIT_TYPES.includes(a.type));
     if (cashAccs.length) {
       const cashParts = cashAccs.map(a => (a.name !== 'Основний' ? a.name + ': ' : '') + fmtAmount(a.currency, a.balance));
-      rowsHtml.push('<div class="bank-row"><span class="name">💵 Готівка</span><span class="vals">' + cashParts.join(' · ') + '</span></div>');
+      rowsHtml.push('<div class="bank-row"><span class="name">💵 ' + t('cash') + '</span><span class="vals">' + cashParts.join(' · ') + '</span></div>');
     }
 
     // Банки (тільки не кредитні) — кожен рахунок окремим рядком
@@ -3385,7 +3398,7 @@
           '</div>';
         if (limit) {
           row += '<div style="font-size:11px;color:rgba(255,255,255,0.6);display:flex;justify-content:space-between;margin-bottom:3px;">' +
-            '<span>' + (hasRemainder ? '✓ Залишок' : 'Борг ' + pct + '%') + '</span>' +
+            '<span>' + (hasRemainder ? '✓ ' + t('remainder_label') : t('debt_label') + ' ' + pct + '%') + '</span>' +
             '<span>' + t('available') + ' ' + fmtAmount(acc.currency, available) + '</span>' +
           '</div>' +
           '<div style="height:3px;background:rgba(255,255,255,0.15);border-radius:2px;">' +
@@ -3413,7 +3426,7 @@
       '<div style="font-size:11px;color:rgba(255,255,255,0.6);margin-bottom:4px;">' + t('credit_cards_title') + '</div>' +
       '<div style="font-size:20px;font-weight:700;color:' + (creditTotal >= 0 ? 'rgba(100,255,150,0.95)' : 'rgba(255,255,255,0.9)') + ';">' +
         creditSign + SYMS[targetCur] + fmt(Math.abs(creditTotal)) +
-        (creditTotal >= 0 ? ' залишок' : ' борг') +
+        (creditTotal >= 0 ? ' ' + t('remainder_label') : ' ' + t('debt_label')) +
       '</div>' +
       '<div class="bank-rows">' + creditRowsHtml.join('') + '</div>' +
     '</div>' : '';
@@ -3461,15 +3474,22 @@
     // Ховаємо кнопку "вперед" якщо вже на поточному
     document.getElementById('period-next').disabled = state.periodOffset >= 0;
   });
-  const ACCOUNT_TYPE_LABELS = {
-    debit: t('type_debit'),
-    debit_fop: t('type_debit_fop'),
-    credit: t('type_credit'),
-    credit_fop: t('type_credit_fop'),
-    cashback: t('type_cashback'),
-    savings_jar: t('type_savings_jar'),
-    other: t('type_other')
-  };
+  function ACCOUNT_TYPE_LABELS_FN() {
+    return {
+      debit: t('type_debit'),
+      debit_fop: t('type_debit_fop'),
+      credit: t('type_credit'),
+      credit_fop: t('type_credit_fop'),
+      cashback: t('type_cashback'),
+      savings_jar: t('type_savings_jar'),
+      other: t('type_other')
+    };
+  }
+  const ACCOUNT_TYPE_LABELS = new Proxy({}, {
+    get(_, prop) { return ACCOUNT_TYPE_LABELS_FN()[prop]; },
+    ownKeys() { return Reflect.ownKeys(ACCOUNT_TYPE_LABELS_FN()); },
+    getOwnPropertyDescriptor(_, prop) { return { enumerable: true, configurable: true, value: ACCOUNT_TYPE_LABELS_FN()[prop] }; }
+  });
 
   function populateAccountSelect() {
     const sel = document.getElementById('account-select');
@@ -3483,18 +3503,18 @@
     const cashWithBalance = cashAccs.filter(a => a.balance);
     if (cashWithBalance.length) {
       cashWithBalance.forEach(a => {
-        const label = a.name !== 'Основний' ? a.name + ' (' + a.currency + ')' : '💵 Готівка (' + a.currency + ')';
+        const label = a.name !== 'Основний' ? a.name + ' (' + a.currency + ')' : '💵 ' + t('cash') + ' (' + a.currency + ')';
         html += '<option value="' + a.id + '">' + label + '</option>';
       });
     } else if (cashAccs.length) {
       // Є рахунки але всі нульові — показуємо їх (щоб можна було записати витрату)
       cashAccs.forEach(a => {
-        const label = a.name !== 'Основний' ? a.name + ' (' + a.currency + ')' : '💵 Готівка (' + a.currency + ')';
+        const label = a.name !== 'Основний' ? a.name + ' (' + a.currency + ')' : '💵 ' + t('cash') + ' (' + a.currency + ')';
         html += '<option value="' + a.id + '">' + label + '</option>';
       });
     } else {
       // Немає жодного рахунку готівки — тільки UAH щоб не захаращувати
-      html += '<option value="__cash_UAH__">💵 Готівка (UAH)</option>';
+      html += '<option value="__cash_UAH__">💵 ' + t('cash') + ' (UAH)</option>';
     }
 
     // 2. Банківські рахунки — тільки з балансом, згруповані по банку
@@ -3761,6 +3781,29 @@
       showAuth();
     }
   }
+
+  // Слухаємо зміни стану авторизації Supabase — це підстраховує від:
+  // 1) гонки станів, коли getSession() ще не побачив сесію, розпізнану з URL
+  //    (наприклад, одразу після переходу по посиланню підтвердження email);
+  // 2) втрати/невдалого оновлення токена в фоні — тоді коректно розлогінюємо,
+  //    а не лишаємо застарілу "напівавторизовану" сесію.
+  sb.auth.onAuthStateChange((event, session) => {
+    if (event === 'SIGNED_OUT') {
+      if (currentUser) {
+        currentUser = null;
+        state.transactions = [];
+        state.balances = {};
+        showAuth();
+      }
+    } else if (session && session.user) {
+      const wasLoggedIn = !!currentUser;
+      currentUser = session.user;
+      if (!wasLoggedIn) {
+        showApp();
+        initAppDataAndRoute();
+      }
+    }
+  });
 
   setType('expense');
   populateAccountSelect();
