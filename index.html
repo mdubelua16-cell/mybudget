@@ -952,11 +952,11 @@
     </div>
     <div class="auth-field">
       <label for="auth-password" data-i18n="password">Пароль</label>
-      <input type="password" id="auth-password" placeholder="Щонайменше 6 символів" autocomplete="current-password">
+      <input type="password" id="auth-password" placeholder="Щонайменше 6 символів" data-i18n-ph="password_ph" autocomplete="current-password">
     </div>
     <div class="auth-field" id="auth-confirm-wrap" style="display:none;">
       <label for="auth-password-confirm" data-i18n="confirm_password">Підтвердити пароль</label>
-      <input type="password" id="auth-password-confirm" placeholder="Введи пароль ще раз" autocomplete="new-password">
+      <input type="password" id="auth-password-confirm" placeholder="Введи пароль ще раз" data-i18n-ph="confirm_password_ph" autocomplete="new-password">
     </div>
 
     <button class="auth-btn" id="auth-submit">Увійти</button>
@@ -1174,7 +1174,9 @@
       login_title: 'Вхід', login_sub: 'Увійди, щоб вести свій бюджет.',
       signup_title: 'Реєстрація', signup_sub: 'Створи акаунт, щоб почати вести бюджет.',
       email: 'Email', password: 'Пароль', confirm_password: 'Підтвердити пароль',
-      confirm_password_ph: 'Введи пароль ще раз',
+      confirm_password_ph: 'Введи пароль ще раз', password_ph: 'Щонайменше 6 символів',
+      waiting_msg: 'Зачекай…',
+      email_confirm_msg: '📧 <strong>Лист надіслано на пошту!</strong><br>Відкрий <strong>{email}</strong>, знайди лист від Supabase і натисни «Confirm email address».<br><br>Після підтвердження повернись сюди і натисни ',
       btn_login: 'Увійти', btn_signup: 'Зареєструватись',
       no_account: 'Ще немає акаунту?', have_account: 'Вже є акаунт?',
       err_fill: 'Заповни email і пароль.', err_short_pass: 'Пароль має містити щонайменше 6 символів.',
@@ -1281,7 +1283,9 @@
       login_title: 'Sign In', login_sub: 'Sign in to manage your budget.',
       signup_title: 'Sign Up', signup_sub: 'Create an account to start tracking your budget.',
       email: 'Email', password: 'Password', confirm_password: 'Confirm Password',
-      confirm_password_ph: 'Enter password again',
+      confirm_password_ph: 'Enter password again', password_ph: 'At least 6 characters',
+      waiting_msg: 'Please wait…',
+      email_confirm_msg: '📧 <strong>Email sent!</strong><br>Open <strong>{email}</strong>, find the email from Supabase and click «Confirm email address».<br><br>After confirming, come back here and click ',
       btn_login: 'Sign In', btn_signup: 'Sign Up',
       no_account: "Don't have an account?", have_account: 'Already have an account?',
       err_fill: 'Please fill in email and password.', err_short_pass: 'Password must be at least 6 characters.',
@@ -1415,12 +1419,10 @@
     // Search placeholder
     const search = document.getElementById('tx-search-input') || document.getElementById('tx-search');
     if (search) search.placeholder = t('search_ph');
-    // Auth mode
+    // Auth mode — використовуємо реальний authMode, а не вгадування за текстом кнопки
     const authTitle = document.getElementById('auth-title');
     if (authTitle) {
-      const mode = document.getElementById('auth-submit')?.textContent === t('btn_login') ? 'login' : 'signup';
-      authTitle.textContent = t(mode === 'login' ? 'login_title' : 'signup_title');
-      document.getElementById('auth-sub').textContent = t(mode === 'login' ? 'login_sub' : 'signup_sub');
+      setAuthMode(authMode);
     }
     // Lang switcher
     document.querySelectorAll('.lang-btn').forEach(b => {
@@ -3732,7 +3734,7 @@
       }
     }
 
-    msgEl.textContent = 'Зачекай…'; msgEl.className = '';
+    msgEl.textContent = t('waiting_msg'); msgEl.className = '';
 
     if (authMode === 'login') {
       const { data, error } = await sb.auth.signInWithPassword({ email, password });
@@ -3752,7 +3754,7 @@
       }
       if (data.user) {
         // Завжди показуємо повідомлення про підтвердження пошти
-        msgEl.innerHTML = '📧 <strong>Лист надіслано на пошту!</strong><br>Відкрий <strong>' + email + '</strong>, знайди лист від Supabase і натисни «Confirm email address».<br><br>Після підтвердження повернись сюди і натисни <strong>«Увійти»</strong>.';
+        msgEl.innerHTML = t('email_confirm_msg').replace('{email}', email) + '<strong>«' + t('btn_login') + '»</strong>.';
         msgEl.className = 'info';
         setAuthMode('login');
         // Якщо сесія вже є — все одно просимо підтвердити
