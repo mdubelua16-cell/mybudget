@@ -135,6 +135,15 @@
     line-height: 1;
   }
   .period-nav-btn:disabled { opacity: 0.3; }
+  .lang-switcher { display:flex; gap:4px; align-items:center; }
+  .lang-btn {
+    background: transparent; border: 1px solid var(--border);
+    border-radius: 6px; color: var(--text-muted); font-size: 12px;
+    font-weight: 600; padding: 3px 7px; font-family: inherit; cursor: pointer;
+    transition: all 0.15s;
+  }
+  .lang-btn.active { background: var(--accent); border-color: var(--accent); color: #fff; }
+  .lang-btn:not(.active):hover { border-color: var(--accent); color: var(--accent); }
 
   /* Currency summary cards */
   .currency-grid {
@@ -928,21 +937,25 @@
 
 <div id="auth-screen">
   <div class="auth-card">
+    <div style="position:absolute;top:16px;right:16px;" class="lang-switcher">
+      <button class="lang-btn active" data-lang="uk">UA</button>
+      <button class="lang-btn" data-lang="en">EN</button>
+    </div>
     <div class="auth-logo">💰</div>
     <h1 id="auth-title">Вхід</h1>
     <p class="sub" id="auth-sub">Увійди, щоб вести свій бюджет.</p>
     <p id="auth-msg"></p>
 
     <div class="auth-field">
-      <label for="auth-email">Email</label>
+      <label for="auth-email" data-i18n="email">Email</label>
       <input type="email" id="auth-email" placeholder="name@example.com" autocomplete="email">
     </div>
     <div class="auth-field">
-      <label for="auth-password">Пароль</label>
+      <label for="auth-password" data-i18n="password">Пароль</label>
       <input type="password" id="auth-password" placeholder="Щонайменше 6 символів" autocomplete="current-password">
     </div>
     <div class="auth-field" id="auth-confirm-wrap" style="display:none;">
-      <label for="auth-password-confirm">Підтвердити пароль</label>
+      <label for="auth-password-confirm" data-i18n="confirm_password">Підтвердити пароль</label>
       <input type="password" id="auth-password-confirm" placeholder="Введи пароль ще раз" autocomplete="new-password">
     </div>
 
@@ -957,7 +970,11 @@
   <header>
     <div class="account-bar">
       <span class="email" id="user-email"></span>
-      <button id="logout-btn">Вийти</button>
+      <div class="lang-switcher">
+        <button class="lang-btn active" data-lang="uk">UA</button>
+        <button class="lang-btn" data-lang="en">EN</button>
+      </div>
+      <button id="logout-btn" data-i18n="logout">Вийти</button>
     </div>
     <h1 id="header-title">Бюджет</h1>
   </header>
@@ -967,10 +984,10 @@
     <!-- STATS VIEW -->
     <div class="view active" id="view-stats">
       <div class="period-row">
-        <button class="period-btn" data-period="day">День</button>
-        <button class="period-btn" data-period="week">Тиждень</button>
-        <button class="period-btn active" data-period="month">Місяць</button>
-        <button class="period-btn" data-period="year">Рік</button>
+        <button class="period-btn" data-period="day" data-i18n-period="day">День</button>
+        <button class="period-btn" data-period="week" data-i18n-period="week">Тиждень</button>
+        <button class="period-btn active" data-period="month" data-i18n-period="month">Місяць</button>
+        <button class="period-btn" data-period="year" data-i18n-period="year">Рік</button>
       </div>
       <div class="period-nav">
         <button class="period-nav-btn" id="period-prev">‹</button>
@@ -991,7 +1008,7 @@
 
     <!-- LIST VIEW -->
     <div class="view" id="view-list">
-      <input type="text" id="tx-search" placeholder="Пошук за коментарем чи категорією" style="margin-top:16px;">
+      <input type="text" id="tx-search" id="tx-search-input" placeholder="Пошук за коментарем чи категорією" style="margin-top:16px;">
       <div class="filter-chips" id="tx-filter-chips"></div>
       <p class="section-title" style="margin-top:16px;">Всі записи</p>
       <div id="tx-list"></div>
@@ -1030,7 +1047,7 @@
         <button id="type-income">Дохід</button>
       </div>
 
-      <p class="field-label">Сума</p>
+      <p class="field-label" data-i18n="amount">Сума</p>
       <div class="amount-row">
         <input type="text" id="amount" placeholder="0,00" inputmode="decimal">
         <select id="currency">
@@ -1041,26 +1058,26 @@
         </select>
       </div>
 
-      <p class="field-label">Рахунок</p>
+      <p class="field-label" data-i18n="account">Рахунок</p>
       <select id="account-select" class="account-select-prominent" style="width:100%; margin-bottom:4px;"></select>
       <p style="font-size:12px; color:var(--text-muted); margin:0 0 16px;">Натисни, щоб обрати готівку, банк або гаманець</p>
 
-      <p class="field-label">Категорія</p>
+      <p class="field-label" data-i18n="category">Категорія</p>
       <div class="cat-grid" id="cat-grid"></div>
 
       <div id="subcat-wrap" style="display:none;">
-        <p class="field-label">Уточнення</p>
+        <p class="field-label" data-i18n="subcategory">Уточнення</p>
         <div class="cat-grid" id="subcat-grid" style="grid-template-columns: repeat(3, 1fr);"></div>
       </div>
 
       <div id="debt-link-row" style="display:none;"></div>
-      <p class="field-label">Дата</p>
+      <p class="field-label" data-i18n="date">Дата</p>
       <input type="date" id="date">
 
-      <p class="field-label">Коментар (опційно)</p>
-      <input type="text" id="note" placeholder="Наприклад, кава з колегами">
+      <p class="field-label" data-i18n="comment">Коментар (опційно)</p>
+      <input type="text" id="note" placeholder="Наприклад, кава з колегами" data-i18n-ph="comment_ph">
 
-      <button class="save-btn" id="save-btn">Зберегти запис</button>
+      <button class="save-btn" id="save-btn" data-i18n="save">Зберегти запис</button>
       <p class="save-msg" id="save-msg"></p>
     </div>
 
@@ -1069,19 +1086,19 @@
   <nav class="tabbar">
     <button class="tab active" data-view="stats">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M4 19V11M12 19V5M20 19V14" stroke-linecap="round" stroke-linejoin="round"/></svg>
-      Статистика
+      <span data-i18n="tab_stats">Статистика</span>
     </button>
     <button class="tab" data-view="add">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="12" cy="12" r="9"/><path d="M12 8v8M8 12h8" stroke-linecap="round"/></svg>
-      Додати
+      <span data-i18n="tab_add">Додати</span>
     </button>
     <button class="tab" data-view="list">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M4 6h16M4 12h16M4 18h10" stroke-linecap="round"/></svg>
-      Записи
+      <span data-i18n="tab_list">Записи</span>
     </button>
     <button class="tab" data-view="accounts">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="3" y="6" width="18" height="13" rx="2"/><path d="M3 10h18" stroke-linecap="round"/></svg>
-      Рахунки
+      <span data-i18n="tab_accounts">Рахунки</span>
     </button>
   </nav>
 </div>
@@ -1148,6 +1165,184 @@
   };
   const CURRENCIES = ['EUR','UAH','USD','PLN'];
   const SYMS = {EUR:'€', UAH:'₴', USD:'$', PLN:'zł', BTC:'₿', ETH:'Ξ', USDT:'₮', SOL:'◎', XRP:'XRP', TRUMP:'TRUMP'};
+
+  // ---- i18n ----
+  let currentLang = localStorage.getItem('lang') || 'uk';
+  const TRANSLATIONS = {
+    uk: {
+      // Auth
+      login_title: 'Вхід', login_sub: 'Увійди, щоб вести свій бюджет.',
+      signup_title: 'Реєстрація', signup_sub: 'Створи акаунт, щоб почати вести бюджет.',
+      email: 'Email', password: 'Пароль', confirm_password: 'Підтвердити пароль',
+      confirm_password_ph: 'Введи пароль ще раз',
+      btn_login: 'Увійти', btn_signup: 'Зареєструватись',
+      no_account: 'Ще немає акаунту?', have_account: 'Вже є акаунт?',
+      err_fill: 'Заповни email і пароль.', err_short_pass: 'Пароль має містити щонайменше 6 символів.',
+      err_confirm: 'Підтверди пароль у третьому полі.', err_mismatch: t('err_mismatch'),
+      err_login: 'Невірний email або пароль.', err_registered: 'Цей email вже зареєстровано.',
+      err_signup: 'Помилка реєстрації. Спробуй ще раз.',
+      // Header
+      logout: 'Вийти',
+      // Tabs
+      tab_stats: 'Статистика', tab_add: 'Додати', tab_list: 'Записи', tab_accounts: 'Рахунки',
+      // Periods
+      day: 'День', week: 'Тиждень', month: 'Місяць', year: 'Рік',
+      refresh_rate: 'Оновити курс',
+      // Stats
+      total: 'Загалом', monthly_limit: 'Місячний ліміт витрат', change: 'Змінити',
+      remaining: 'Залишилось', expenses_by_cat: 'ВИТРАТИ ПО КАТЕГОРІЯХ', income_by_cat: 'ДОХОДИ ПО КАТЕГОРІЯХ',
+      owed_to_me: 'Винні мені (всього)', owed_by_me: 'Я винен (всього)',
+      // Add form
+      expense: 'Витрата', income: 'Дохід', amount: 'Сума', account: 'Рахунок',
+      category: 'Категорія', subcategory: 'Уточнення', date: 'Дата',
+      comment: 'Коментар (опційно)', comment_ph: 'Наприклад, кава з колегами',
+      save: 'Зберегти запис', saved: 'Запис збережено.', save_err: 'Помилка збереження. Спробуй ще раз.',
+      no_amount: 'Вкажи коректну суму.', no_date: 'Вкажи дату.',
+      link_debt: "Прив'язати до боргу (опційно)",
+      no_link: "— Без прив'язки —",
+      // List
+      all_records: 'ВСІ ЗАПИСИ', search_ph: 'Пошук за коментарем чи категорією',
+      filter_all: 'Усі', filter_expenses: 'Витрати', filter_income: 'Доходи',
+      link_to_debt: "Прив'язати до боргу",
+      // Accounts
+      own_funds: 'Власні кошти', credit_cards: 'КРЕДИТНІ КАРТКИ',
+      cash: 'Готівка', crypto: 'Крипто', banks: 'БАНКИ',
+      add_account: '+ Додати рахунок', new_account: '+ Новий рахунок',
+      acc_name_ph: 'Назва (напр. Біла картка)', balance_ph: 'Поточний баланс (0)',
+      credit_limit_ph: 'Кредитний ліміт (тільки для кредитних карток)',
+      btn_edit: 'Редагувати', btn_done: 'Готово', btn_cancel: 'Скасувати',
+      btn_delete: 'Видалити', btn_save: 'Зберегти', btn_add_account: 'Додати рахунок',
+      savings: 'ЗАОЩАДЖЕННЯ', savings_total: 'Заощадження (всього)',
+      no_records: 'Немає записів.',
+      debts_title: 'ПОВЕРНЕННЯ БОРГІВ ТА МОЇ БОРГИ',
+      owed_me_card: 'Винні мені', owed_by_card: 'Я винен',
+      add_debt: '+ Додати борг до трекера',
+      new_debt_to_me: '+ Хто мені винен', new_debt_by_me: '+ Кому я винен',
+      debt_who: 'Хто винен', debt_whom: 'Кому винен', debt_amount: 'Сума боргу',
+      debt_currency: 'Валюта', debt_desc: 'Опис (опційно)', debt_save: 'Зберегти',
+      debt_remaining: 'залишок', debt_paid: 'Закрито', debt_payment: '+ Повернення',
+      debt_closed: 'Закриті:', saving_btn: 'Збереження…',
+      credit_tracker: 'КРЕДИТНІ КАРТКИ — ТРЕКЕР',
+      own_funds_label: '💳 Власні кошти:', available: 'Доступно:',
+      credit_used: 'Використано', credit_paid: '✓ Повністю погашено',
+      credit_remainder: '✓ Залишок на картці', repay: '+ Погасити кредит',
+      repay_source: '— Звідки поповнюєш —', terminal: '🏧 Термінал / банкомат', other_source: '💸 Інше',
+      repay_amount_ph: 'Сума погашення', repay_note_ph: 'Коментар (опційно)',
+      budget_title: 'Бюджет', new_record: 'Новий запис', all_records_title: 'Всі записи',
+      accounts_title: 'Рахунки',
+      select_account_ph: 'Натисни, щоб обрати готівку, банк або гаманець',
+      all_countries: 'Всі', cancel: 'Скасувати',
+    },
+    en: {
+      // Auth
+      login_title: 'Sign In', login_sub: 'Sign in to manage your budget.',
+      signup_title: 'Sign Up', signup_sub: 'Create an account to start tracking your budget.',
+      email: 'Email', password: 'Password', confirm_password: 'Confirm Password',
+      confirm_password_ph: 'Enter password again',
+      btn_login: 'Sign In', btn_signup: 'Sign Up',
+      no_account: "Don't have an account?", have_account: 'Already have an account?',
+      err_fill: 'Please fill in email and password.', err_short_pass: 'Password must be at least 6 characters.',
+      err_confirm: 'Please confirm your password.', err_mismatch: "Passwords don't match. Please try again.",
+      err_login: 'Invalid email or password.', err_registered: 'This email is already registered.',
+      err_signup: 'Registration error. Please try again.',
+      // Header
+      logout: 'Sign Out',
+      // Tabs
+      tab_stats: 'Stats', tab_add: 'Add', tab_list: 'Records', tab_accounts: 'Accounts',
+      // Periods
+      day: 'Day', week: 'Week', month: 'Month', year: 'Year',
+      refresh_rate: 'Refresh rates',
+      // Stats
+      total: 'Total', monthly_limit: 'Monthly spending limit', change: 'Change',
+      remaining: 'Remaining', expenses_by_cat: 'EXPENSES BY CATEGORY', income_by_cat: 'INCOME BY CATEGORY',
+      owed_to_me: 'Owed to me (total)', owed_by_me: 'I owe (total)',
+      // Add form
+      expense: 'Expense', income: 'Income', amount: 'Amount', account: 'Account',
+      category: 'Category', subcategory: 'Subcategory', date: 'Date',
+      comment: 'Comment (optional)', comment_ph: 'E.g. coffee with colleagues',
+      save: 'Save record', saved: 'Record saved.', save_err: 'Save error. Please try again.',
+      no_amount: 'Please enter a valid amount.', no_date: 'Please enter a date.',
+      link_debt: 'Link to debt (optional)',
+      no_link: '— No link —',
+      // List
+      all_records: 'ALL RECORDS', search_ph: 'Search by comment or category',
+      filter_all: 'All', filter_expenses: 'Expenses', filter_income: 'Income',
+      link_to_debt: 'Link to debt',
+      // Accounts
+      own_funds: 'Own funds', credit_cards: 'CREDIT CARDS',
+      cash: 'Cash', crypto: 'Crypto', banks: 'BANKS',
+      add_account: '+ Add account', new_account: '+ New account',
+      acc_name_ph: 'Name (e.g. Black card)', balance_ph: 'Current balance (0)',
+      credit_limit_ph: 'Credit limit (for credit cards only)',
+      btn_edit: 'Edit', btn_done: 'Done', btn_cancel: 'Cancel',
+      btn_delete: 'Delete', btn_save: 'Save', btn_add_account: 'Add account',
+      savings: 'SAVINGS', savings_total: 'Savings (total)',
+      no_records: 'No records.',
+      debts_title: 'DEBT TRACKER',
+      owed_me_card: 'Owed to me', owed_by_card: 'I owe',
+      add_debt: '+ Add debt to tracker',
+      new_debt_to_me: '+ Who owes me', new_debt_by_me: '+ Whom I owe',
+      debt_who: 'Who owes', debt_whom: 'Whom I owe', debt_amount: 'Debt amount',
+      debt_currency: 'Currency', debt_desc: 'Description (optional)', debt_save: 'Save',
+      debt_remaining: 'remaining', debt_paid: 'Closed', debt_payment: '+ Payment',
+      debt_closed: 'Closed:', saving_btn: 'Saving…',
+      credit_tracker: 'CREDIT CARDS — TRACKER',
+      own_funds_label: '💳 Own funds:', available: 'Available:',
+      credit_used: 'Used', credit_paid: '✓ Fully repaid',
+      credit_remainder: '✓ Credit balance', repay: '+ Repay credit',
+      repay_source: '— Source of funds —', terminal: '🏧 ATM / terminal', other_source: '💸 Other',
+      repay_amount_ph: 'Repayment amount', repay_note_ph: 'Comment (optional)',
+      budget_title: 'Budget', new_record: 'New record', all_records_title: 'All records',
+      accounts_title: 'Accounts',
+      select_account_ph: 'Tap to select cash, bank or wallet',
+      all_countries: 'All', cancel: 'Cancel',
+    }
+  };
+  function t(key) { return (TRANSLATIONS[currentLang] || TRANSLATIONS.uk)[key] || key; }
+  function setLang(lang) {
+    currentLang = lang;
+    localStorage.setItem('lang', lang);
+    applyLang();
+  }
+  function applyLang() {
+    // Всі елементи з data-i18n
+    document.querySelectorAll('[data-i18n]').forEach(el => {
+      el.textContent = t(el.dataset.i18n);
+    });
+    // Placeholder атрибути
+    document.querySelectorAll('[data-i18n-ph]').forEach(el => {
+      el.placeholder = t(el.dataset.i18nPh);
+    });
+    // Period buttons
+    document.querySelectorAll('[data-i18n-period]').forEach(btn => {
+      btn.textContent = t(btn.dataset.i18nPeriod);
+    });
+    // Search placeholder
+    const search = document.getElementById('tx-search-input') || document.getElementById('tx-search');
+    if (search) search.placeholder = t('search_ph');
+    // Auth mode
+    const authTitle = document.getElementById('auth-title');
+    if (authTitle) {
+      const mode = document.getElementById('auth-submit')?.textContent === t('btn_login') ? 'login' : 'signup';
+      authTitle.textContent = t(mode === 'login' ? 'login_title' : 'signup_title');
+      document.getElementById('auth-sub').textContent = t(mode === 'login' ? 'login_sub' : 'signup_sub');
+    }
+    // Lang switcher
+    document.querySelectorAll('.lang-btn').forEach(b => {
+      b.classList.toggle('active', b.dataset.lang === currentLang);
+    });
+    // Expense/Income buttons
+    document.getElementById('type-expense') && (document.getElementById('type-expense').textContent = t('expense'));
+    document.getElementById('type-income') && (document.getElementById('type-income').textContent = t('income'));
+    // Refresh rates button
+    const refreshBtn = document.querySelector('.refresh-btn') || document.getElementById('refresh-rates');
+    if (refreshBtn) refreshBtn.textContent = t('refresh_rate');
+    // Re-render
+    if (document.getElementById('app').style.display !== 'none') {
+      renderAll();
+      renderAccounts();
+    }
+  }
   const CREDIT_TYPES = ['credit', 'credit_fop'];
   function fmtAmount(currency, amount) {
     const sym = SYMS[currency];
@@ -1709,7 +1904,7 @@
     document.querySelectorAll('.view').forEach(v => v.classList.remove('active'));
     document.getElementById('view-' + view).classList.add('active');
     document.querySelectorAll('.tab').forEach(t => t.classList.toggle('active', t.dataset.view === view));
-    const titles = {stats:'Бюджет', add:'Новий запис', list:'Всі записи', accounts:'Рахунки'};
+    const titles = {stats:t('budget_title'), add:t('new_record'), list:t('all_records_title'), accounts:t('accounts_title')};
     document.getElementById('header-title').textContent = titles[view];
     if (view === 'stats') renderStats();
     if (view === 'list') { renderFilterChips(); renderList(); }
@@ -1990,7 +2185,7 @@
       return;
     }
 
-    let html = '<p class="section-title">Витрати по категоріях</p>';
+    let html = '<p class="section-title">' + t('expenses_by_cat') + '</p>';
     relevantCurs.forEach(cur => {
       const txs = state.transactions.filter(t => t.currency === cur && t.type === 'expense' && txInPeriod(t, state.period));
       const total = txs.reduce((s,t)=>s+Number(t.amount),0);
@@ -2011,7 +2206,7 @@
       state.transactions.some(t => t.currency === cur && t.type === 'income' && txInPeriod(t, state.period) && !isPendingTx(t))
     );
     if (incomeCurs.length > 0) {
-      html += '<p class="section-title" style="margin-top:24px;">Доходи по категоріях</p>';
+      html += '<p class="section-title" style="margin-top:24px;">' + t('income_by_cat') + '</p>';
       incomeCurs.forEach(cur => {
         const txs = state.transactions.filter(t => t.currency === cur && t.type === 'income' && txInPeriod(t, state.period) && !isPendingTx(t));
         const total = txs.reduce((s,t)=>s+Number(t.amount),0);
@@ -3314,10 +3509,10 @@
     const msgEl = document.getElementById('save-msg');
 
     if (!amount || amount <= 0) {
-      msgEl.textContent = 'Вкажи коректну суму.'; msgEl.className = 'save-msg err'; return;
+      msgEl.textContent = t('no_amount'); msgEl.className = 'save-msg err'; return;
     }
     if (!date) {
-      msgEl.textContent = 'Вкажи дату.'; msgEl.className = 'save-msg err'; return;
+      msgEl.textContent = t('no_date'); msgEl.className = 'save-msg err'; return;
     }
 
     // Якщо вибрано дефолтний варіант готівки (ще немає іменованого рахунку) — створюємо його автоматично
@@ -3347,14 +3542,14 @@
         renderOwedBalance();
         renderOwedStatsCards();
       }
-      msgEl.textContent = 'Запис збережено.'; msgEl.className = 'save-msg ok';
+      msgEl.textContent = t('saved'); msgEl.className = 'save-msg ok';
       document.getElementById('amount').value = '';
       document.getElementById('note').value = '';
       // Скидаємо селектор боргу
       if (debtLinkSel) debtLinkSel.value = '';
       renderStats();
     } else {
-      msgEl.textContent = 'Помилка збереження. Спробуй ще раз.'; msgEl.className = 'save-msg err';
+      msgEl.textContent = t('save_err'); msgEl.className = 'save-msg err';
     }
     setTimeout(() => { msgEl.textContent=''; msgEl.className='save-msg'; }, 2200);
   });
@@ -3391,34 +3586,16 @@
 
   function setAuthMode(mode) {
     authMode = mode;
-    const title = document.getElementById('auth-title');
-    const sub = document.getElementById('auth-sub');
-    const submitBtn = document.getElementById('auth-submit');
-    const switchText = document.getElementById('switch-text');
-    const switchBtn = document.getElementById('switch-btn');
+    document.getElementById('auth-title').textContent = t(mode === 'login' ? 'login_title' : 'signup_title');
+    document.getElementById('auth-sub').textContent = t(mode === 'login' ? 'login_sub' : 'signup_sub');
+    document.getElementById('auth-submit').textContent = t(mode === 'login' ? 'btn_login' : 'btn_signup');
+    document.getElementById('switch-text').textContent = t(mode === 'login' ? 'no_account' : 'have_account');
+    document.getElementById('switch-btn').textContent = t(mode === 'login' ? 'btn_signup' : 'btn_login');
     const confirmWrap = document.getElementById('auth-confirm-wrap');
-    if (mode === 'login') {
-      title.textContent = 'Вхід';
-      sub.textContent = 'Увійди, щоб вести свій бюджет.';
-      submitBtn.textContent = 'Увійти';
-      switchText.textContent = 'Ще немає акаунту?';
-      switchBtn.textContent = 'Зареєструватись';
-      confirmWrap.style.display = 'none';
-      document.getElementById('auth-password').autocomplete = 'current-password';
-    } else {
-      title.textContent = 'Реєстрація';
-      sub.textContent = 'Створи акаунт, щоб почати вести бюджет.';
-      submitBtn.textContent = 'Зареєструватись';
-      switchText.textContent = 'Вже є акаунт?';
-      switchBtn.textContent = 'Увійти';
-      confirmWrap.style.display = 'block';
-      document.getElementById('auth-password').autocomplete = 'new-password';
-    }
+    confirmWrap.style.display = mode === 'login' ? 'none' : 'block';
+    document.getElementById('auth-password').autocomplete = mode === 'login' ? 'current-password' : 'new-password';
     const msgEl = document.getElementById('auth-msg');
-    if (!msgEl.classList.contains('info')) {
-      msgEl.textContent = '';
-      msgEl.className = '';
-    }
+    if (!msgEl.classList.contains('info')) { msgEl.textContent = ''; msgEl.className = ''; }
     document.getElementById('auth-password-confirm').value = '';
   }
 
@@ -3432,20 +3609,20 @@
     const msgEl = document.getElementById('auth-msg');
 
     if (!email || !password) {
-      msgEl.textContent = 'Заповни email і пароль.'; msgEl.className = 'err'; return;
+      msgEl.textContent = t('err_fill'); msgEl.className = 'err'; return;
     }
     if (password.length < 6) {
-      msgEl.textContent = 'Пароль має містити щонайменше 6 символів.'; msgEl.className = 'err'; return;
+      msgEl.textContent = t('err_short_pass'); msgEl.className = 'err'; return;
     }
 
     // Перевірка підтвердження пароля при реєстрації
     if (authMode === 'signup') {
       const confirm = document.getElementById('auth-password-confirm').value;
       if (!confirm) {
-        msgEl.textContent = 'Підтверди пароль у третьому полі.'; msgEl.className = 'err'; return;
+        msgEl.textContent = t('err_confirm'); msgEl.className = 'err'; return;
       }
       if (password !== confirm) {
-        msgEl.textContent = 'Паролі не збігаються. Перевір і спробуй ще раз.'; msgEl.className = 'err'; return;
+        msgEl.textContent = t('err_mismatch'); msgEl.className = 'err'; return;
       }
     }
 
@@ -3454,7 +3631,7 @@
     if (authMode === 'login') {
       const { data, error } = await sb.auth.signInWithPassword({ email, password });
       if (error) {
-        msgEl.textContent = 'Невірний email або пароль.'; msgEl.className = 'err';
+        msgEl.textContent = t('err_login'); msgEl.className = 'err';
         return;
       }
       currentUser = data.user;
@@ -3463,7 +3640,7 @@
     } else {
       const { data, error } = await sb.auth.signUp({ email, password });
       if (error) {
-        msgEl.textContent = error.message.includes('already registered') ? 'Цей email вже зареєстровано.' : 'Помилка реєстрації. Спробуй ще раз.';
+        msgEl.textContent = error.message.includes('already registered') ? t('err_registered') : t('err_signup');
         msgEl.className = 'err';
         return;
       }
@@ -3501,6 +3678,15 @@
 
   setType('expense');
   populateAccountSelect();
+
+  // Ініціалізуємо мову
+  document.querySelectorAll('.lang-btn').forEach(btn => {
+    btn.classList.toggle('active', btn.dataset.lang === currentLang);
+    btn.addEventListener('click', () => setLang(btn.dataset.lang));
+  });
+  // Застосовуємо збережену мову при завантаженні
+  if (currentLang !== 'uk') applyLang();
+
   initAuth();
 })();
 </script>
