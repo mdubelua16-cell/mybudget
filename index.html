@@ -1591,7 +1591,11 @@
       if (cached) {
         const parsed = JSON.parse(cached);
         const ageHours = (Date.now() - parsed.fetchedAt) / 3600000;
-        if (ageHours < 12) { rates = parsed; return; }
+        // Якщо кеш ще з часів до підтримки PLN (немає ключа PLN взагалі) —
+        // не довіряємо йому навіть якщо він "свіжий", інакше злотий
+        // залишиться незаконвертованим аж до наступного природного оновлення.
+        const hasPlnKey = Object.prototype.hasOwnProperty.call(parsed, 'PLN');
+        if (ageHours < 12 && hasPlnKey) { rates = parsed; return; }
       }
     } catch (e) {}
     await fetchRates();
@@ -2216,11 +2220,12 @@
 
     let total = 0;
     let hasRates = rates.EUR && rates.USD;
+    let hasUnconverted = false;
 
     txs.forEach(t => {
       if (isPendingTx(t)) return;
       const converted = convertAmount(Number(t.amount), t.currency, targetCur);
-      if (converted === null) return;
+      if (converted === null) { hasUnconverted = true; return; }
       total += t.type === 'income' ? converted : -converted;
     });
 
@@ -2236,7 +2241,7 @@
       const updated = rates.fetchedAt ? new Date(rates.fetchedAt).toLocaleString(dateLocale(), {day:'numeric', month:'short', hour:'2-digit', minute:'2-digit'}) : '';
       card.innerHTML = '<div class="label">' + t('total_label') + ' ' + currencySelector + ' <button class="refresh-rate-btn" id="refresh-rate">' + t('refresh_rates_btn') + '</button></div>' +
         '<div class="value" style="color:' + color + '">' + (total>=0?'+':'') + SYMS[targetCur] + fmt(total) + '</div>' +
-        '<div class="rate-info">1 EUR ≈ ' + fmt(rates.EUR) + ' ₴ · 1 USD ≈ ' + fmt(rates.USD) + ' ₴' + (rates.PLN ? ' · 1 PLN ≈ ' + fmt(rates.PLN) + ' ₴' : '') + ' · ' + t('updated_label') + ' ' + updated + '</div>';
+        '<div class="rate-info">1 EUR ≈ ' + fmt(rates.EUR) + ' ₴ · 1 USD ≈ ' + fmt(rates.USD) + ' ₴' + (rates.PLN ? ' · 1 PLN ≈ ' + fmt(rates.PLN) + ' ₴' : '') + ' · ' + t('updated_label') + ' ' + updated + (hasUnconverted ? ' · ' + t('unconverted_note') : '') + '</div>';
     }
 
     const selectEl = document.getElementById('stats-currency-select');
@@ -3340,9 +3345,11 @@
     const cryptoInTarget = fromUahAmount(cryptoUah, targetCur) || 0;
 
     let total = cryptoInTarget;
+    let hasUnconvertedAccounts = false;
     CURRENCIES.forEach(cur => {
       const converted = convertAmount(sumsByCurrency[cur], cur, targetCur);
-      if (converted !== null) total += converted;
+      if (converted !== null) { total += converted; }
+      else if (sumsByCurrency[cur]) { hasUnconvertedAccounts = true; }
     });
 
     const breakdown = CURRENCIES.filter(c => sumsByCurrency[c] > 0)
@@ -3439,6 +3446,7 @@
       '<div class="label">' + t('own_funds_title') + ' ' + currencySelector + '</div>' +
       '<div class="value">' + SYMS[targetCur] + fmt(total) + '</div>' +
       (breakdown ? '<div class="breakdown">' + breakdown + '</div>' : '') +
+      (hasUnconvertedAccounts ? '<div style="font-size:11px;color:rgba(255,255,255,0.75);margin-top:4px;">' + t('unconverted_note') + '</div>' : '') +
       (rowsHtml.length ? '<div class="bank-rows">' + rowsHtml.join('') + '</div>' : '') +
       creditSection +
     '</div>';
